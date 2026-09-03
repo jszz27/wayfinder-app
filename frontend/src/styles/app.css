@@ -46,6 +46,17 @@ body {
   padding: 24px 16px;
 }
 
+/* #root sits between body and the widget. As a flex item with no width of
+   its own it takes its max-content size, so the widget's min(560px, 100%)
+   resolved against a width that tracked the longest caption line -- every
+   interim result resized the widget and body re-centred it, which read as
+   the layout bouncing sideways. */
+#root {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
 .widget {
   width: min(560px, 100%);
   display: flex;
