@@ -82,7 +82,7 @@ session API.
 - [x] Receive loop and STT consume loop are decoupled by a per-session queue
 - [x] `caption.seq` follows the line-counter rule above
 - [x] An STT failure sends one `error` message, then closes (retry/fallback is Sprint 5)
-- [ ] Real speech produces captions with `WAYFINDER_STT=google`
+- [x] Real speech produces captions with `WAYFINDER_STT=google`
 - [x] Mock-path tests still pass
 
 ### Issue 4 — Mic input → send `frontend`
@@ -129,19 +129,27 @@ Recorded at sprint end so the checkboxes above are traceable.
 | Google adapter against the real SDK | `pip install ".[google]"`, then every symbol `google_v2.py` uses constructed offline: `ExplicitDecodingConfig` at LINEAR16 / 16 000 Hz / 1 channel, `interim_results=True`, both `StreamingRecognizeRequest` forms, and the `results` → `alternatives[0].transcript` / `is_final` read path. `SpeechAsyncClient.streaming_recognize(requests=…)` signature matches the call site |
 | `WAYFINDER_STT=google` selection path | `create_stt_stream()` returns `GoogleSttStream`; an unset `GOOGLE_CLOUD_PROJECT` raises before any network call |
 | Mock path unaffected by the new dependency | `pytest` in `backend-ws`: 18 passed; `pip check`: no broken requirements |
+| Live credentials | Organization policy `iam.disableServiceAccountKeyCreation` blocks service-account keys, so Application Default Credentials are used instead (`gcloud auth application-default login` plus a quota project). No key file exists |
+| Real speech, real service | A 33 s Korean session against `WAYFINDER_STT=google`: interim lines revised in place and finalised, `caption.seq` behaving as specified. The Speech API's enablement is proven by the absence of a `403` |
+| `uvicorn --env-file` actually applies | The same silent WAV yields no captions on port 8001 (`--env-file ../.env`, Google) and scripted captions on port 8002 (mock). Nothing in the app auto-loads `.env`, so the flag is required |
 
-One criterion remains open: **real speech has not been transcribed**, because
-no Google Cloud credentials were available in the development environment.
+**Every acceptance criterion is met.** The two that had been blocked on
+credentials are closed: the adapter is exercised against the installed SDK,
+and real Korean speech has been transcribed through the live service.
 
-The adapter itself is no longer merely written. It is now exercised against
-the installed SDK — every type, field, and enum it references resolves, the
-recognition config it builds carries the agreed wire format, and the factory
-selects it under `WAYFINDER_STT=google`. What that cannot prove is the part
-that needs a live service: whether Google accepts the inline recognizer at
-the configured location, whether `model=long` suits Korean streaming, and
-how interim results actually segment against the `caption.seq` line rule.
-Those are the risks Sprint 2 inherits. Everything else runs against the mock
-adapter.
+The risk this sprint carried longest — whether Google's real interim results
+would segment sensibly against the `caption.seq` line rule agreed above —
+did not materialise. Lines were revised in place and finalised as specified.
+
+One defect surfaced only under live conditions and is fixed: long sentences
+made the whole widget jump sideways. `body` is a flex container and `#root`
+had no width of its own, so it took its max-content size and the widget's
+`min(560px, 100%)` resolved against a width that tracked the longest caption
+line. Every interim result resized the widget between 276 px and 474 px, and
+`justify-content: center` turned each resize into a horizontal jump. Giving
+`#root` a definite width fixes it. Notably this was invisible to the mock
+adapter, whose caption lines are a fixed length — only variable-length real
+speech crossed the threshold.
 
 ## Out of scope this sprint
 

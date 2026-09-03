@@ -85,7 +85,13 @@ never raised as a blocker until the checklist was being closed out. It
 should have been flagged at sprint planning, when there was still time to
 request access.
 
-**Carried into Sprint 2.** Live Google STT verification — whether the
-inline recognizer is accepted at the configured location, whether
-`model=long` suits Korean streaming, and how real interim results segment
-against the `caption.seq` line rule.
+**What live testing caught that mocks could not.** The mock adapter emits
+caption lines of a fixed length. Real speech does not, and a long sentence
+made the whole widget jump sideways several times a second — a layout bug
+that had been latent since Issue 0 and that no test, and no amount of
+mock-driven clicking, would ever have surfaced. Worth remembering when a
+sprint leans on a stand-in for the one dependency it cannot reach:
+*variability is part of the behaviour being stubbed out.*
+
+**Carried into Sprint 2.** Nothing from Sprint 1 — all acceptance criteria
+are met. Sprint 2 starts on guide mode (`Plan.md` §10).
