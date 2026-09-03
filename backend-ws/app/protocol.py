@@ -1,7 +1,8 @@
 """The WebSocket message set from Plan.md section 5.
 
 This module is the single place the wire format is defined. The five
-message types below are exactly the ones in the spec -- no extra fields.
+message types below are the ones in the spec; `caption.language` is the
+one field added since, for automatic language detection.
 """
 
 from __future__ import annotations
@@ -43,6 +44,10 @@ class CaptionMessage(BaseModel):
     text: str
     is_final: bool
     seq: int
+    # Added after Sprint 1 for automatic language detection: the tag the
+    # text was recognised as, or null when the language was configured
+    # rather than detected. See Plan.md section 5.
+    language: str | None = None
 
 
 class ErrorMessage(BaseModel):

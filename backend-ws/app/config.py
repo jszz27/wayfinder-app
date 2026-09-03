@@ -19,9 +19,13 @@ class Settings:
 
     stt_backend: str
     stt_language: str
+    """Pinned language, and the fallback when detection cannot name one."""
+
     stt_model: str
+    stt_auto_detect: bool
     google_project: str | None
     google_location: str
+    google_detect_location: str
     cors_origins: tuple[str, ...]
 
 
@@ -33,7 +37,10 @@ def get_settings() -> Settings:
         stt_backend=os.getenv("WAYFINDER_STT", "mock").lower(),
         stt_language=os.getenv("STT_LANGUAGE", "ko-KR"),
         stt_model=os.getenv("STT_MODEL", "long"),
+        stt_auto_detect=os.getenv("STT_AUTO_DETECT", "false").lower() == "true",
         google_project=os.getenv("GOOGLE_CLOUD_PROJECT"),
         google_location=os.getenv("GOOGLE_CLOUD_LOCATION", "global"),
+        # Language detection needs a regional endpoint; "global" has no chirp_2.
+        google_detect_location=os.getenv("GOOGLE_DETECT_LOCATION", "us-central1"),
         cors_origins=origins,
     )

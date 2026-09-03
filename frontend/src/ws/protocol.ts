@@ -15,6 +15,11 @@ export interface CaptionMessage {
   is_final: boolean;
   /** Caption line ordinal; see docs/sprint-1.md. */
   seq: number;
+  /**
+   * BCP-47 tag the text was recognised as, present only when the language
+   * was detected rather than configured. Null on every other path.
+   */
+  language?: string | null;
 }
 
 export interface ErrorMessage {

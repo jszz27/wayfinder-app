@@ -15,12 +15,30 @@ const STATUS_TEXT: Record<SessionStatus, string> = {
   stopping: "Finishing up…",
 };
 
+/** Renders a BCP-47 tag as a language name, e.g. ko-KR -> Korean.
+ *
+ * Only the primary subtag is named, because the full tag reads as a
+ * dialect -- "American English", "Korean (South Korea)" -- which is more
+ * than the chip is claiming. Mandarin is reported as cmn, which
+ * Intl.DisplayNames does not know by that name.
+ */
+function languageName(tag: string): string {
+  const primary = tag.split("-")[0] ?? tag;
+  const forDisplay = primary === "cmn" || primary === "yue" ? "zh" : primary;
+  try {
+    return new Intl.DisplayNames(["en"], { type: "language" }).of(forDisplay) ?? tag;
+  } catch {
+    return tag;
+  }
+}
+
 export default function App() {
   const [mode, setMode] = useState<Mode>("caption");
   const [source, setSource] = useState<AudioSource>("mic");
   const [fontSize, setFontSize] = useState<number>(FONT_SIZES[1]);
 
-  const { status, lines, notice, start, stop, dismissNotice } = useCaptionSession(source);
+  const { status, lines, notice, language, start, stop, dismissNotice } =
+    useCaptionSession(source);
   const running = status !== "idle";
 
   return (
@@ -32,9 +50,16 @@ export default function App() {
           {/* The audio source is fixed for the whole session (Plan.md
               section 5), so the control locks while a stream is open. */}
           <SourcePill source={source} onChange={setSource} locked={running} />
-          <p className="status-text" aria-live="polite">
-            {STATUS_TEXT[status]}
-          </p>
+          <div className="status-row">
+            <p className="status-text" aria-live="polite">
+              {STATUS_TEXT[status]}
+            </p>
+            {language && (
+              <span className="language-chip" aria-live="polite">
+                {languageName(language)}
+              </span>
+            )}
+          </div>
 
           <CaptionPanel
             lines={lines}

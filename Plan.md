@@ -80,12 +80,14 @@ Client → server:
 
 Server → client:
 ```json
-{ "type": "caption", "text": "...", "is_final": false, "seq": 42 }
+{ "type": "caption", "text": "...", "is_final": false, "seq": 42, "language": "ko-KR" }
 { "type": "error", "message": "..." }
 { "type": "stream_ended", "session_id": "..." }
 ```
 
 `is_final: false` marks an interim result that may still be revised; `is_final: true` marks a confirmed sentence, and only confirmed sentences are written to the database.
+
+`language` is the BCP-47 tag the audio was recognised as. It is present only when the language was detected rather than configured, and `null` otherwise. Added after Sprint 1; see `docs/sprint-1.md`.
 
 ## 6. Database Schema (PostgreSQL)
 

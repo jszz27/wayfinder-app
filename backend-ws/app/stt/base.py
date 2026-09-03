@@ -18,10 +18,13 @@ class SttResult:
 
     `is_final` maps straight onto Plan.md section 5: False marks an
     interim result that may still be revised, True a confirmed sentence.
+    `language` is the BCP-47 tag the text was recognised as, set only when
+    the language was detected rather than configured.
     """
 
     text: str
     is_final: bool
+    language: str | None = None
 
 
 class SttStream(abc.ABC):

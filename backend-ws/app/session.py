@@ -103,7 +103,10 @@ class CaptionStreamSession:
             async for result in self._stt.results():
                 await self._send(
                     CaptionMessage(
-                        text=result.text, is_final=result.is_final, seq=self._line_seq
+                        text=result.text,
+                        is_final=result.is_final,
+                        seq=self._line_seq,
+                        language=result.language,
                     )
                 )
                 if result.is_final:

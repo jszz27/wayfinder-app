@@ -47,6 +47,12 @@ the §5 message set, so Sprint 1 fixes the language server-side via
 size only. The language selector lands in Sprint 3 together with the
 session API.
 
+> **Superseded after Sprint 1.** Rather than a selector, the language is
+> now detected automatically, and `caption.language` was added to §5 to
+> report it -- the one field added since. The §5 message set is otherwise
+> still frozen, and `SPEC_FIELDS` in `tests/test_caption_ws.py` keeps it
+> that way.
+
 ---
 
 ## Issues

@@ -15,8 +15,11 @@ CHUNKS_PER_RESULT = 3
 RESULTS_PER_LINE = 3
 CHUNKS_PER_LINE = CHUNKS_PER_RESULT * RESULTS_PER_LINE
 
+# Plan.md section 5, plus caption.language, added after Sprint 1 for
+# automatic language detection. Kept as an exhaustive set so that any
+# further drift in the wire format has to be a deliberate edit here.
 SPEC_FIELDS = {
-    "caption": {"type", "text", "is_final", "seq"},
+    "caption": {"type", "text", "is_final", "seq", "language"},
     "error": {"type", "message"},
     "stream_ended": {"type", "session_id"},
 }
@@ -75,6 +78,17 @@ def test_server_messages_carry_only_the_spec_fields(client):
     assert {m["type"] for m in seen} == {"caption", "stream_ended"}
     for message in seen:
         assert set(message) == SPEC_FIELDS[message["type"]]
+
+
+def test_language_is_null_when_it_was_configured_rather_than_detected(client):
+    # The mock adapter never detects anything, so the field must stay null
+    # instead of echoing STT_LANGUAGE back as though it had been recognised.
+    with connect(client) as ws:
+        send_chunks(ws, CHUNKS_PER_RESULT)
+        caption = ws.receive_json()
+        ws.send_json({"type": "end_stream"})
+
+    assert caption["language"] is None
 
 
 def test_end_stream_flushes_the_open_line_then_acknowledges(client):

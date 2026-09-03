@@ -42,6 +42,26 @@ With `WAYFINDER_STT=mock` the full path runs without any cloud
 credentials. Set `WAYFINDER_STT=google` plus the `GOOGLE_*` variables to
 use real Google Cloud Speech-to-Text v2 streaming.
 
+Nothing in the app loads `.env` by itself, so pass it explicitly:
+`uvicorn app.main:app --port 8001 --env-file ..\.env`.
+
+## Language
+
+`STT_AUTO_DETECT=true` works the language out from the opening seconds of
+audio and shows it beside the status line. English, Korean, Spanish,
+Mandarin, Japanese, French, Hindi, Arabic, Portuguese, German and Russian
+are recognised; anything else falls back to `STT_LANGUAGE`.
+
+Google has no single streaming model that both detects a language and
+returns interim results, so two are used for what each is good at. One
+short synchronous `chirp_2` call names the language, then the session
+streams on `long`, pinned to it. The cost is about three seconds at the
+start of a session; captions are word-by-word live from then on. Detection
+needs a regional endpoint (`GOOGLE_DETECT_LOCATION`) because `chirp_2`
+does not exist in `global`.
+
+The interface language is separate and is English throughout.
+
 ## Tests
 
 ```powershell

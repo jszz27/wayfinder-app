@@ -13,6 +13,10 @@ def create_stt_stream(settings: Settings) -> SttStream:
         return MockSttStream()
     if backend == "google":
         # Imported lazily so the mock path needs no google-cloud-speech.
+        if settings.stt_auto_detect:
+            from app.stt.auto import AutoDetectSttStream
+
+            return AutoDetectSttStream(settings)
         from app.stt.google_v2 import GoogleSttStream
 
         return GoogleSttStream(settings)

@@ -30,6 +30,7 @@ export function useCaptionSession(source: AudioSource) {
   const [status, setStatus] = useState<SessionStatus>("idle");
   const [lines, setLines] = useState<CaptionLine[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  const [language, setLanguage] = useState<string | null>(null);
 
   const socketRef = useRef<CaptionSocket | null>(null);
   const captureRef = useRef<MicCapture | null>(null);
@@ -72,6 +73,7 @@ export function useCaptionSession(source: AudioSource) {
     if (statusRef.current !== "idle") return;
     setNotice(null);
     setLines([]);
+    setLanguage(null);
     setStatus("starting");
     statusRef.current = "starting";
 
@@ -80,6 +82,7 @@ export function useCaptionSession(source: AudioSource) {
       const socket = new CaptionSocket(captionSocketUrl(sessionId), source, {
         onCaption: (caption) => {
           setLines((previous) => mergeLine(previous, caption.seq, caption.text, caption.is_final));
+          if (caption.language) setLanguage(caption.language);
         },
         onError: (message) => setNotice(message),
         onStreamEnded: () => void finish(),
@@ -120,6 +123,7 @@ export function useCaptionSession(source: AudioSource) {
     status,
     lines,
     notice,
+    language,
     start,
     stop,
     dismissNotice: useCallback(() => setNotice(null), []),
