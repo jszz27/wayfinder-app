@@ -1,0 +1,39 @@
+"""Environment-backed settings for the WebSocket caption server."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from functools import lru_cache
+
+# The audio wire format agreed with the widget; see docs/sprint-1.md.
+SAMPLE_RATE_HZ = 16_000
+CHANNELS = 1
+
+_DEFAULT_CORS_ORIGINS = "http://localhost:5173"
+
+
+@dataclass(frozen=True)
+class Settings:
+    """Values read once from the environment at startup."""
+
+    stt_backend: str
+    stt_language: str
+    stt_model: str
+    google_project: str | None
+    google_location: str
+    cors_origins: tuple[str, ...]
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    raw_origins = os.getenv("CORS_ORIGINS", _DEFAULT_CORS_ORIGINS)
+    origins = tuple(o.strip() for o in raw_origins.split(",") if o.strip())
+    return Settings(
+        stt_backend=os.getenv("WAYFINDER_STT", "mock").lower(),
+        stt_language=os.getenv("STT_LANGUAGE", "ko-KR"),
+        stt_model=os.getenv("STT_MODEL", "long"),
+        google_project=os.getenv("GOOGLE_CLOUD_PROJECT"),
+        google_location=os.getenv("GOOGLE_CLOUD_LOCATION", "global"),
+        cors_origins=origins,
+    )

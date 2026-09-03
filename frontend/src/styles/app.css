@@ -1,0 +1,283 @@
+/* Plan.md section 8: one lightweight widget, no routing. The visual
+   hierarchy is deliberate -- mode tabs read as the primary control, the
+   audio source pill below them reads as a sub-setting of caption mode. */
+
+:root {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --border: #e2e2e6;
+  --text: #1c1c1e;
+  --text-muted: #6b6b73;
+  --text-faded: #9a9aa3;
+  --accent: #2f5bd7;
+  --accent-contrast: #ffffff;
+  --danger: #b3261e;
+  --danger-bg: #fdeceb;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131316;
+    --surface: #1c1c20;
+    --border: #33333a;
+    --text: #f2f2f4;
+    --text-muted: #a2a2ad;
+    --text-faded: #6f6f7a;
+    --accent: #7b9bf5;
+    --accent-contrast: #10131c;
+    --danger: #f2b8b5;
+    --danger-bg: #3a1f1d;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, "Segoe UI", "Malgun Gothic", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.widget {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* --- mode tabs: the primary control --------------------------------- */
+
+.mode-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-tab {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.mode-tab[aria-selected="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.mode-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* --- source pill: a sub-setting, visually lighter -------------------- */
+
+.source-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.source-label {
+  font-size: 12px;
+  color: var(--text-faded);
+}
+
+.source-pill {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.source-segment {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.source-segment[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.source-segment:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.status-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* --- captions -------------------------------------------------------- */
+
+.caption-panel {
+  min-height: 220px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  line-height: 1.55;
+}
+
+.caption-placeholder {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-faded);
+}
+
+.caption-line {
+  margin: 0 0 8px;
+  color: var(--text-faded);
+}
+
+/* The most recently confirmed line, per Plan.md section 8. */
+.caption-line.is-latest {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Interim text may still be revised, so it never looks confirmed. */
+.caption-line.is-interim {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.caption-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: caption-blink 1s steps(2, start) infinite;
+}
+
+@keyframes caption-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caption-cursor {
+    animation: none;
+  }
+}
+
+/* --- actions and notices --------------------------------------------- */
+
+.primary-button {
+  padding: 14px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent-contrast);
+  background: var(--accent);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.primary-button.is-running {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.primary-button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-radius: 10px;
+}
+
+.notice-dismiss {
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+/* --- settings -------------------------------------------------------- */
+
+.settings-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-label {
+  font-size: 12px;
+  color: var(--text-faded);
+}
+
+.settings-options {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.settings-option {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.settings-option[aria-checked="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.placeholder-pane {
+  padding: 40px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-faded);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
