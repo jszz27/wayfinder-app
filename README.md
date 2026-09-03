@@ -3,7 +3,7 @@
 AI-powered communication and digital accessibility platform.
 Full product plan and specification: [`Plan.md`](./Plan.md).
 
-> **Status: Sprint 1 — WebSocket caption MVP.**
+> **Status: Sprint 1 complete — WebSocket caption MVP.**
 > A minimal working path from microphone input, through the WebSocket
 > server, to STT, to captions rendered in the widget. Guide mode, auth,
 > persistence, and CI/CD are later sprints (see `Plan.md` §12).
@@ -54,5 +54,38 @@ cd frontend;     npm run build    # type-check + bundle
 Per `Plan.md` §12, each sprint closes with a short retrospective here.
 
 ### Sprint 1 (weeks 1–2) — WebSocket caption MVP
-Issue checklist: [`docs/sprint-1.md`](./docs/sprint-1.md). Retrospective
-to be written at sprint review.
+Issue checklist and verification evidence:
+[`docs/sprint-1.md`](./docs/sprint-1.md).
+
+**Delivered.** The whole intended path runs: microphone → WebSocket → STT
+→ captions on screen. 26 tests pass (18 in `backend-ws`, 8 in
+`backend-rest`) and the widget builds clean. Every acceptance criterion is
+met except live transcription against Google.
+
+**What worked.** Settling the two ambiguities in `Plan.md` §5 *before*
+writing code — what `caption.seq` counts, and the exact audio wire format
+— and recording both in `docs/sprint-1.md` rather than in code comments.
+Each had two plausible readings, and picking one silently would have meant
+a client and a server that disagreed at integration time.
+
+Building the mock STT adapter first was the other decision that paid off.
+It let the full path be assembled and verified end to end with no cloud
+account, so the sprint was never blocked waiting on credentials, and the
+`SttStream` seam it forced is what makes the Google adapter a drop-in.
+
+**What did not.** The `google` extra was never installed until sprint
+close, so the Google adapter sat unparsed against the real SDK for the
+whole sprint — written, plausible, and completely unverified. Installing
+it took under a minute and would have caught any wrong type or renamed
+field immediately. *Install the dependency when you write the adapter,
+even when you cannot yet call the service.*
+
+The related miss: the credential dependency was known from day one but
+never raised as a blocker until the checklist was being closed out. It
+should have been flagged at sprint planning, when there was still time to
+request access.
+
+**Carried into Sprint 2.** Live Google STT verification — whether the
+inline recognizer is accepted at the configured location, whether
+`model=long` suits Korean streaming, and how real interim results segment
+against the `caption.seq` line rule.

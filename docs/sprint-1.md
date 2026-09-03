@@ -78,7 +78,7 @@ session API.
 
 ### Issue 3 — STT API integration `backend-ws`
 - [x] `SttStream` interface: `push(pcm)`, `results()`, `close()`
-- [ ] Google Cloud STT v2 streaming adapter, LINEAR16 / 16 kHz / mono, `interim_results=True`
+- [x] Google Cloud STT v2 streaming adapter, LINEAR16 / 16 kHz / mono, `interim_results=True`
 - [x] Receive loop and STT consume loop are decoupled by a per-session queue
 - [x] `caption.seq` follows the line-counter rule above
 - [x] An STT failure sends one `error` message, then closes (retry/fallback is Sprint 5)
@@ -126,11 +126,22 @@ Recorded at sprint end so the checkboxes above are traceable.
 | Stop path | `end_stream` flushed the open interim line into a confirmed line, then the UI returned to idle |
 | Denied microphone | `getUserMedia` stubbed to reject with `NotAllowedError`: readable message shown in a `role="alert"` region, UI back to idle |
 | Font size setting | Caption panel computed size stepped 16 → 20 → 26 → 34 px |
+| Google adapter against the real SDK | `pip install ".[google]"`, then every symbol `google_v2.py` uses constructed offline: `ExplicitDecodingConfig` at LINEAR16 / 16 000 Hz / 1 channel, `interim_results=True`, both `StreamingRecognizeRequest` forms, and the `results` → `alternatives[0].transcript` / `is_final` read path. `SpeechAsyncClient.streaming_recognize(requests=…)` signature matches the call site |
+| `WAYFINDER_STT=google` selection path | `create_stt_stream()` returns `GoogleSttStream`; an unset `GOOGLE_CLOUD_PROJECT` raises before any network call |
+| Mock path unaffected by the new dependency | `pytest` in `backend-ws`: 18 passed; `pip check`: no broken requirements |
 
-Two criteria remain open because they need Google Cloud credentials, which
-were not available in the development environment: the Google STT v2
-adapter is written but unexercised, and real speech has not been
-transcribed. Everything else runs against the mock adapter.
+One criterion remains open: **real speech has not been transcribed**, because
+no Google Cloud credentials were available in the development environment.
+
+The adapter itself is no longer merely written. It is now exercised against
+the installed SDK — every type, field, and enum it references resolves, the
+recognition config it builds carries the agreed wire format, and the factory
+selects it under `WAYFINDER_STT=google`. What that cannot prove is the part
+that needs a live service: whether Google accepts the inline recognizer at
+the configured location, whether `model=long` suits Korean streaming, and
+how interim results actually segment against the `caption.seq` line rule.
+Those are the risks Sprint 2 inherits. Everything else runs against the mock
+adapter.
 
 ## Out of scope this sprint
 
