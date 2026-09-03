@@ -42,8 +42,9 @@ With `WAYFINDER_STT=mock` the full path runs without any cloud
 credentials. Set `WAYFINDER_STT=google` plus the `GOOGLE_*` variables to
 use real Google Cloud Speech-to-Text v2 streaming.
 
-Nothing in the app loads `.env` by itself, so pass it explicitly:
-`uvicorn app.main:app --port 8001 --env-file ..\.env`.
+Both services read the repository's `.env` themselves at startup, so no
+flag is needed. Real environment variables take precedence over the file,
+which is what lets a deployment set its own configuration.
 
 ## Guide mode
 

@@ -5,6 +5,14 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load the repository's .env before any setting is read. Real environment
+# variables win (override=False), so a deployment's configuration is never
+# overridden by a developer's local file.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 _DEFAULT_CORS_ORIGINS = "http://localhost:5173"
 

@@ -137,7 +137,7 @@ Recorded at sprint end so the checkboxes above are traceable.
 | Mock path unaffected by the new dependency | `pytest` in `backend-ws`: 18 passed; `pip check`: no broken requirements |
 | Live credentials | Organization policy `iam.disableServiceAccountKeyCreation` blocks service-account keys, so Application Default Credentials are used instead (`gcloud auth application-default login` plus a quota project). No key file exists |
 | Real speech, real service | A 33 s Korean session against `WAYFINDER_STT=google`: interim lines revised in place and finalised, `caption.seq` behaving as specified. The Speech API's enablement is proven by the absence of a `403` |
-| `uvicorn --env-file` actually applies | The same silent WAV yields no captions on port 8001 (`--env-file ../.env`, Google) and scripted captions on port 8002 (mock). Nothing in the app auto-loads `.env`, so the flag is required |
+| `uvicorn --env-file` actually applies | The same silent WAV yields no captions on port 8001 (`--env-file ../.env`, Google) and scripted captions on port 8002 (mock). Nothing in the app auto-loaded `.env` at the time, so the flag was required. Superseded in Sprint 2: both services now read `.env` themselves and the flag is optional |
 
 **Every acceptance criterion is met.** The two that had been blocked on
 credentials are closed: the adapter is exercised against the installed SDK,
