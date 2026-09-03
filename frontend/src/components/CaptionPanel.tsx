@@ -46,12 +46,7 @@ export function CaptionPanel({ lines, fontSize, placeholder }: CaptionPanelProps
               {line.text}
             </p>
           ))}
-          {interim && (
-            <p className="caption-line is-interim">
-              {interim.text}
-              <span className="caption-cursor" aria-hidden="true" />
-            </p>
-          )}
+          {interim && <p className="caption-line is-interim">{interim.text}</p>}
         </>
       )}
     </div>

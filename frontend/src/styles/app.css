@@ -177,28 +177,6 @@ body {
   font-style: italic;
 }
 
-.caption-cursor {
-  display: inline-block;
-  width: 2px;
-  height: 1em;
-  margin-left: 3px;
-  vertical-align: text-bottom;
-  background: var(--accent);
-  animation: caption-blink 1s steps(2, start) infinite;
-}
-
-@keyframes caption-blink {
-  to {
-    visibility: hidden;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .caption-cursor {
-    animation: none;
-  }
-}
-
 /* --- actions and notices --------------------------------------------- */
 
 .primary-button {
