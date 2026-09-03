@@ -25,6 +25,10 @@ class SttResult:
     text: str
     is_final: bool
     language: str | None = None
+    # How sure the recogniser is, on finals only. It collapses when the
+    # stream is pinned to the wrong language, which is how a speaker
+    # switching language mid-session is noticed. None when not reported.
+    confidence: float | None = None
 
 
 class SttStream(abc.ABC):

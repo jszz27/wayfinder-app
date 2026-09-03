@@ -97,13 +97,24 @@ class FakeStream(SttStream):
     async def close(self) -> None:
         self.closed = True
 
+    #: One list of results per instance, in the order they are opened.
+    scripts: list[list[SttResult]] = []
+
     async def results(self):
-        yield SttResult(text="hello", is_final=True)
+        index = FakeStream.instances.index(self)
+        script = (
+            FakeStream.scripts[index]
+            if index < len(FakeStream.scripts)
+            else [SttResult(text="hello", is_final=True)]
+        )
+        for result in script:
+            yield result
 
 
 @pytest.fixture
 def fake_google(monkeypatch):
     FakeStream.instances = []
+    FakeStream.scripts = []
     import app.stt.google_v2 as google_v2
 
     monkeypatch.setattr(google_v2, "GoogleSttStream", FakeStream)
@@ -239,3 +250,157 @@ async def test_closing_without_any_audio_yields_nothing_and_opens_no_session(
 
     assert await drain(stream) == []
     assert fake_google.instances == []
+
+
+# --- following a speaker who changes language ------------------------
+
+
+def detector(*answers):
+    """A detect_language stub that answers differently each time."""
+    calls = {"n": 0}
+
+    async def detect(pcm, settings):
+        index = min(calls["n"], len(answers) - 1)
+        calls["n"] += 1
+        return answers[index]
+
+    detect.calls = calls
+    return detect
+
+
+@pytest.mark.asyncio
+async def test_a_confident_result_never_triggers_a_second_detection(
+    fake_google, monkeypatch
+):
+    detect = detector("en-US")
+    monkeypatch.setattr("app.stt.auto.detect_language", detect)
+    FakeStream.scripts = [[SttResult(text="hello", is_final=True, confidence=0.97)]]
+    stream = AutoDetectSttStream(settings())
+
+    await stream.push(enough_to_detect())
+    await drain(stream)
+
+    assert detect.calls["n"] == 1  # the opening detection, and no more
+    assert len(fake_google.instances) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_collapsed_confidence_reopens_the_stream_in_the_new_language(
+    fake_google, monkeypatch
+):
+    # Confidence collapses when the audio stops matching the pinned
+    # language, which is how a speaker switching mid-session is noticed.
+    monkeypatch.setattr(
+        "app.stt.auto.detect_language", detector("en-US", "ko-KR")
+    )
+    FakeStream.scripts = [
+        [SttResult(text="annyeonghaseyo", is_final=True, confidence=0.03)],
+        [SttResult(text="\uc548\ub155\ud558\uc138\uc694", is_final=True, confidence=0.95)],
+    ]
+    stream = AutoDetectSttStream(settings())
+
+    await stream.push(enough_to_detect())
+    results = await drain(stream)
+
+    assert len(fake_google.instances) == 2
+    assert fake_google.instances[0].settings.stt_language == "en-US"
+    assert fake_google.instances[1].settings.stt_language == "ko-KR"
+    assert stream.language == "ko-KR"
+    # The first result was already out before the switch was known, so it
+    # keeps the language it was recognised under.
+    assert [r.language for r in results] == ["en-US", "ko-KR"]
+
+
+@pytest.mark.asyncio
+async def test_the_misheard_audio_is_replayed_into_the_new_stream(
+    fake_google, monkeypatch
+):
+    monkeypatch.setattr(
+        "app.stt.auto.detect_language", detector("en-US", "ko-KR")
+    )
+    FakeStream.scripts = [
+        [SttResult(text="gibberish", is_final=True, confidence=0.04)],
+        [SttResult(text="fine", is_final=True, confidence=0.95)],
+    ]
+    stream = AutoDetectSttStream(settings())
+
+    await stream.push(enough_to_detect())
+    await drain(stream)
+
+    # Whatever was misheard is handed to the new stream rather than lost.
+    assert b"".join(fake_google.instances[1].pushed)
+
+
+@pytest.mark.asyncio
+async def test_the_old_stream_is_closed_after_a_switch(fake_google, monkeypatch):
+    monkeypatch.setattr(
+        "app.stt.auto.detect_language", detector("en-US", "ko-KR")
+    )
+    FakeStream.scripts = [
+        [SttResult(text="gibberish", is_final=True, confidence=0.04)],
+        [SttResult(text="fine", is_final=True, confidence=0.95)],
+    ]
+    stream = AutoDetectSttStream(settings())
+
+    await stream.push(enough_to_detect())
+    await drain(stream)
+
+    assert fake_google.instances[0].closed is True
+
+
+@pytest.mark.asyncio
+async def test_unclear_audio_in_the_same_language_does_not_reopen_anything(
+    fake_google, monkeypatch
+):
+    # Re-detection returning the language already in use means the speaker
+    # mumbled, not that they switched. Restarting would lose their words
+    # for no reason.
+    detect = detector("en-US", "en-US")
+    monkeypatch.setattr("app.stt.auto.detect_language", detect)
+    FakeStream.scripts = [
+        [SttResult(text="mmm", is_final=True, confidence=0.06)]
+    ]
+    stream = AutoDetectSttStream(settings())
+
+    await stream.push(enough_to_detect())
+    await drain(stream)
+
+    assert detect.calls["n"] == 2  # it did look again
+    assert len(fake_google.instances) == 1  # but stayed put
+    assert stream.language == "en-US"
+
+
+@pytest.mark.asyncio
+async def test_interim_results_never_trigger_detection(fake_google, monkeypatch):
+    # Only finals carry a confidence worth acting on; an interim is still
+    # being revised.
+    detect = detector("en-US", "ko-KR")
+    monkeypatch.setattr("app.stt.auto.detect_language", detect)
+    FakeStream.scripts = [
+        [SttResult(text="partial", is_final=False, confidence=0.01)]
+    ]
+    stream = AutoDetectSttStream(settings())
+
+    await stream.push(enough_to_detect())
+    await drain(stream)
+
+    assert detect.calls["n"] == 1
+    assert len(fake_google.instances) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_missing_confidence_is_not_read_as_a_bad_one(
+    fake_google, monkeypatch
+):
+    # The mock adapter reports no confidence at all; that must not be
+    # mistaken for a hopeless result and send the session re-detecting.
+    detect = detector("en-US", "ko-KR")
+    monkeypatch.setattr("app.stt.auto.detect_language", detect)
+    FakeStream.scripts = [[SttResult(text="hello", is_final=True)]]
+    stream = AutoDetectSttStream(settings())
+
+    await stream.push(enough_to_detect())
+    await drain(stream)
+
+    assert detect.calls["n"] == 1
+    assert len(fake_google.instances) == 1

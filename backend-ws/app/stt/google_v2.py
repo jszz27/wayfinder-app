@@ -31,21 +31,35 @@ def results_from_response(response: object) -> list[SttResult]:
     last on screen -- which reads as the caption blinking mid-sentence.
     """
     settled = ""
+    settled_confidence: float | None = None
     tail: list[str] = []
     for result in response.results:
         if not result.alternatives:
             continue
-        transcript = result.alternatives[0].transcript
+        alternative = result.alternatives[0]
+        transcript = alternative.transcript
         if not transcript:
             continue
         if result.is_final:
             settled += transcript
+            # The proto reports an unset confidence as 0.0, which is
+            # indistinguishable from a genuinely hopeless result. Treat
+            # only a positive value as a reading.
+            reported = getattr(alternative, "confidence", 0.0) or 0.0
+            if reported > 0.0:
+                settled_confidence = (
+                    reported
+                    if settled_confidence is None
+                    else min(settled_confidence, reported)
+                )
         else:
             tail.append(transcript)
 
     mapped: list[SttResult] = []
     if settled:
-        mapped.append(SttResult(text=settled, is_final=True))
+        mapped.append(
+            SttResult(text=settled, is_final=True, confidence=settled_confidence)
+        )
     if tail:
         mapped.append(SttResult(text="".join(tail), is_final=False))
     return mapped

@@ -77,6 +77,15 @@ accuracy. At three seconds all eleven languages are identified and the
 first caption arrives about five seconds in. At two seconds the first
 caption arrives about 3.5 seconds in, but Arabic is misread as Hindi.
 
+If the speaker changes language mid-session, the caption follows. Google's
+streaming models transcribe one language per stream -- given several codes
+they pick one and drop the rest -- so a switch is noticed through the
+recogniser's own confidence, which collapses when the audio stops matching
+the language it was told to expect. That triggers a fresh detection and, if
+the language really has changed, a new stream with the recent audio
+replayed into it. Captions resume in the new language about four seconds
+after the switch.
+
 Google has no single streaming model that both detects a language and
 returns interim results, so two are used for what each is good at. One
 short synchronous `chirp_2` call names the language, then the session
