@@ -15,9 +15,25 @@ class Settings:
 
     cors_origins: tuple[str, ...]
 
+    # Guide mode (Plan.md section 4). "mock" needs no cloud project.
+    llm_backend: str
+    google_project: str | None
+    gemini_location: str
+    gemini_model: str
+    gemini_max_output_tokens: int
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     raw = os.getenv("CORS_ORIGINS", _DEFAULT_CORS_ORIGINS)
     origins = tuple(origin.strip() for origin in raw.split(",") if origin.strip())
-    return Settings(cors_origins=origins)
+    return Settings(
+        cors_origins=origins,
+        llm_backend=os.getenv("WAYFINDER_LLM", "mock").lower(),
+        google_project=os.getenv("GOOGLE_CLOUD_PROJECT"),
+        # Gemini is served from regional endpoints; "global" also works but
+        # us-central1 is where the speech models this project uses already live.
+        gemini_location=os.getenv("GEMINI_LOCATION", "us-central1"),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        gemini_max_output_tokens=int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "400")),
+    )

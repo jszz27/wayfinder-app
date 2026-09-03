@@ -2,7 +2,7 @@ import type { AudioSource } from "./ws/protocol";
 
 // Empty base means same-origin, which the Vite dev proxy forwards to the
 // two backend services. Override per environment if they are hosted apart.
-const REST_BASE = import.meta.env.VITE_REST_BASE_URL ?? "";
+export const REST_BASE = import.meta.env.VITE_REST_BASE_URL ?? "";
 
 export async function createCaptionSession(
   audioSource: AudioSource,

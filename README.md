@@ -3,7 +3,7 @@
 AI-powered communication and digital accessibility platform.
 Full product plan and specification: [`Plan.md`](./Plan.md).
 
-> **Status: Sprint 1 complete — WebSocket caption MVP.**
+> **Status: Sprint 2 complete — guide mode.**
 > A minimal working path from microphone input, through the WebSocket
 > server, to STT, to captions rendered in the widget. Guide mode, auth,
 > persistence, and CI/CD are later sprints (see `Plan.md` §12).
@@ -14,7 +14,7 @@ Full product plan and specification: [`Plan.md`](./Plan.md).
 |---|---|---|
 | `frontend/` | Lightweight React widget | Implemented |
 | `backend-ws/` | WebSocket server (caption streaming) | Implemented |
-| `backend-rest/` | REST API server (FastAPI) | Skeleton — health + session creation |
+| `backend-rest/` | REST API server (FastAPI) | Health, caption sessions, guide mode |
 | `backend-ws/app/stt/` | External AI API (STT) | STT only; no TTS or LLM yet |
 | — | PostgreSQL | Sprint 3 |
 | — | GitHub Actions / Cloud Run | Sprint 4 (`Dockerfile`s staged now) |
@@ -44,6 +44,24 @@ use real Google Cloud Speech-to-Text v2 streaming.
 
 Nothing in the app loads `.env` by itself, so pass it explicitly:
 `uvicorn app.main:app --port 8001 --env-file ..\.env`.
+
+## Guide mode
+
+The second tab is a chat: the user describes what they are stuck on and
+gets one next step back in plain language. Turning on "screen reference"
+starts a browser screen share; a single frame is then captured at the
+moment each question is sent and passed to a vision model along with the
+text (`Plan.md` §10).
+
+The screenshot is never stored. It is decoded, used for that one question,
+and dropped — only the text of both turns is kept, so nothing sensitive
+that happened to be on screen is retained.
+
+`WAYFINDER_LLM=mock` runs the whole flow, screenshot path included, with
+no cloud project. `WAYFINDER_LLM=gemini` uses Gemini 2.5 Flash through
+Vertex AI, authenticating with the same credentials as speech-to-text.
+
+Issue checklist and evidence: [`docs/sprint-2.md`](./docs/sprint-2.md).
 
 ## Language
 
@@ -79,6 +97,11 @@ cd frontend;     npm run build    # type-check + bundle
 ## Sprint log
 
 Per `Plan.md` §12, each sprint closes with a short retrospective here.
+
+### Sprint 2 (weeks 3–4) — Guide mode
+Issue checklist and verification evidence:
+[`docs/sprint-2.md`](./docs/sprint-2.md). Retrospective to be written at
+sprint review.
 
 ### Sprint 1 (weeks 1–2) — WebSocket caption MVP
 Issue checklist and verification evidence:

@@ -1,9 +1,12 @@
 import { useState } from "react";
 
 import { CaptionPanel } from "./components/CaptionPanel";
+import { GuidePanel } from "./components/GuidePanel";
 import { ModeTabs, type Mode } from "./components/ModeTabs";
+import { ScreenPill } from "./components/ScreenPill";
 import { SettingsBar, FONT_SIZES } from "./components/SettingsBar";
 import { SourcePill } from "./components/SourcePill";
+import { useGuideSession } from "./guide/useGuideSession";
 import { useCaptionSession, type SessionStatus } from "./useCaptionSession";
 import type { AudioSource } from "./ws/protocol";
 
@@ -14,6 +17,13 @@ const STATUS_TEXT: Record<SessionStatus, string> = {
   reconnecting: "Connection lost. Reconnecting…",
   stopping: "Finishing up…",
 };
+
+function guideStatusText(sending: boolean, complete: boolean, sharing: boolean): string {
+  if (complete) return "This conversation is finished.";
+  if (sending) return "Working out the next step…";
+  if (sharing) return "The guide can see your screen when you send a question.";
+  return "Ask what to do next, one step at a time.";
+}
 
 /** Renders a BCP-47 tag as a language name, e.g. ko-KR -> Korean.
  *
@@ -39,7 +49,10 @@ export default function App() {
 
   const { status, lines, notice, language, start, stop, dismissNotice } =
     useCaptionSession(source);
+  const guide = useGuideSession();
   const running = status !== "idle";
+  const guideSending = guide.status === "sending";
+  const guideComplete = guide.status === "complete";
 
   return (
     <main className="widget">
@@ -88,7 +101,61 @@ export default function App() {
           <SettingsBar fontSize={fontSize} onFontSizeChange={setFontSize} />
         </>
       ) : (
-        <p className="placeholder-pane">Digital guide mode arrives in a later sprint.</p>
+        <>
+          {/* Plan.md section 10: screen sharing is never implicit -- the
+              user turns it on, and can see and turn it off at any time. */}
+          <ScreenPill
+            sharing={guide.sharing}
+            busy={guideSending}
+            onTurnOn={() => void guide.startSharing()}
+            onTurnOff={guide.stopSharing}
+          />
+          <div className="status-row">
+            <p className="status-text" aria-live="polite">
+              {guideStatusText(guideSending, guideComplete, guide.sharing)}
+            </p>
+          </div>
+
+          <GuidePanel
+            messages={guide.messages}
+            fontSize={fontSize}
+            sending={guideSending}
+            complete={guideComplete}
+            onSend={(text) => void guide.send(text)}
+          />
+
+          {guide.notice && (
+            <div className="notice" role="alert">
+              <span>{guide.notice}</span>
+              <button
+                type="button"
+                className="notice-dismiss"
+                onClick={guide.dismissNotice}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {guideComplete ? (
+            <button type="button" className="primary-button" onClick={guide.reset}>
+              Start a new conversation
+            </button>
+          ) : (
+            guide.hasSession && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void guide.finish()}
+                disabled={guideSending}
+              >
+                Finish this conversation
+              </button>
+            )
+          )}
+
+          <SettingsBar fontSize={fontSize} onFontSizeChange={setFontSize} />
+        </>
       )}
     </main>
   );

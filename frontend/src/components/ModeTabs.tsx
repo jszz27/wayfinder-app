@@ -24,8 +24,7 @@ export function ModeTabs({ mode, onChange }: ModeTabsProps) {
         role="tab"
         className="mode-tab"
         aria-selected={mode === "guide"}
-        disabled
-        title="Guide mode arrives in a later sprint."
+        onClick={() => onChange("guide")}
       >
         Digital guide
       </button>
