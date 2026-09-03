@@ -30,3 +30,6 @@ Thumbs.db
 # --- Local scratch ---
 *.log
 tmp/
+
+# Screen recordings kept for manual testing.
+*.mp4
