@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { GuideMessage } from "../guide/api";
 
@@ -12,6 +12,11 @@ interface GuidePanelProps {
 
 const PLACEHOLDER = "Describe what you are stuck on.";
 
+/** How tall the question box may grow before it scrolls instead. Past
+ *  this it would start pushing the conversation off the screen, which
+ *  costs more than seeing the last line of a long question. */
+const MAX_INPUT_HEIGHT = 168;
+
 // Plan.md section 8: a chat-style UI. The answer is what the reader needs,
 // so it carries the weight; their own question stays quieter above it.
 export function GuidePanel({
@@ -23,6 +28,24 @@ export function GuidePanel({
 }: GuidePanelProps) {
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // The box grows with the question so a long one stays readable without
+  // being dragged open. Height is reset to auto first, otherwise
+  // scrollHeight only ever reports the height it already has.
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.style.height = "auto";
+    // scrollHeight covers padding but not the border, while box-sizing is
+    // border-box, so the border has to be added back or the last line is
+    // clipped by exactly the border width.
+    const style = getComputedStyle(input);
+    const border =
+      parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+    const wanted = input.scrollHeight + border;
+    input.style.height = `${Math.min(wanted, MAX_INPUT_HEIGHT)}px`;
+  }, [draft]);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -79,7 +102,8 @@ export function GuidePanel({
         <textarea
           id="guide-input"
           className="guide-input"
-          rows={2}
+          ref={inputRef}
+          rows={1}
           value={draft}
           placeholder={complete ? "This conversation is finished." : PLACEHOLDER}
           disabled={complete}

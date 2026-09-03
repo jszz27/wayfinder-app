@@ -248,9 +248,12 @@ body {
 }
 
 .guide-composer {
+  /* The box and the button match at rest; once the box grows past this,
+     the button stays put at the bottom rather than stretching with it. */
+  --composer-rest: 64px;
   display: flex;
   gap: 8px;
-  align-items: stretch;
+  align-items: flex-end;
 }
 
 .guide-input {
@@ -262,7 +265,10 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  resize: vertical;
+  /* Height is driven by the content, so there is nothing to drag. */
+  resize: none;
+  overflow-y: auto;
+  min-height: var(--composer-rest);
 }
 
 .guide-input:disabled {
@@ -271,7 +277,7 @@ body {
 
 .guide-send {
   flex: none;
-  align-self: stretch;
+  height: var(--composer-rest);
   padding: 0 20px;
   font-size: 15px;
 }
