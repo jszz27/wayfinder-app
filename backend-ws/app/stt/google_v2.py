@@ -20,6 +20,37 @@ from app.stt.base import SttResult, SttStream
 _INLINE_RECOGNIZER = "_"
 
 
+def results_from_response(response: object) -> list[SttResult]:
+    """Map one streaming response onto at most one settled line and one tail.
+
+    A response holds consecutive portions of the audio being processed: at
+    most one is_final portion that has just settled, then any number of
+    interim portions. The interim portions are one hypothesis split across
+    entries, not competing guesses, so they are joined. Emitting them
+    separately gives them all the same caption seq, and each overwrites the
+    last on screen -- which reads as the caption blinking mid-sentence.
+    """
+    settled = ""
+    tail: list[str] = []
+    for result in response.results:
+        if not result.alternatives:
+            continue
+        transcript = result.alternatives[0].transcript
+        if not transcript:
+            continue
+        if result.is_final:
+            settled += transcript
+        else:
+            tail.append(transcript)
+
+    mapped: list[SttResult] = []
+    if settled:
+        mapped.append(SttResult(text=settled, is_final=True))
+    if tail:
+        mapped.append(SttResult(text="".join(tail), is_final=False))
+    return mapped
+
+
 class GoogleSttStream(SttStream):
     def __init__(self, settings: Settings) -> None:
         if not settings.google_project:
@@ -86,10 +117,5 @@ class GoogleSttStream(SttStream):
 
         responses = await client.streaming_recognize(requests=requests())
         async for response in responses:
-            for result in response.results:
-                if not result.alternatives:
-                    continue
-                transcript = result.alternatives[0].transcript
-                if not transcript:
-                    continue
-                yield SttResult(text=transcript, is_final=result.is_final)
+            for mapped in results_from_response(response):
+                yield mapped
