@@ -49,15 +49,21 @@ def resolve_language(detected: str | None) -> str | None:
     """
     if not detected:
         return None
-    code = detected.strip()
-    if not code:
+    parts = detected.strip().split("-")
+    primary = parts[0].lower()
+    if not primary:
         return None
-    primary = code.split("-", 1)[0].lower()
     if primary in ("cmn", "zh", "yue"):
         # Mandarin is "cmn-Hans-CN" to the streaming model, never a bare tag.
         return "cmn-Hans-CN"
-    if "-" in code:
-        return code
+    if len(parts) > 1 and len(parts[1]) == 4 and parts[1].isalpha():
+        # A script subtag, not a region: chirp_2 reports Arabic speech as
+        # "ar-Latn" (Arabic written in Latin letters) about as often as
+        # "ar". The language is right, so keep it and supply a region the
+        # streaming model accepts instead of passing the script through.
+        return _DEFAULT_REGION.get(primary)
+    if len(parts) > 1:
+        return "-".join(parts)
     return _DEFAULT_REGION.get(primary)
 
 

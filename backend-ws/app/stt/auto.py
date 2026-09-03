@@ -18,9 +18,11 @@ from app.stt.detect import detect_language
 
 logger = logging.getLogger(__name__)
 
-# Two seconds is enough for chirp_2 to name a language and short enough
-# that the wait is not felt as the caption being broken.
-DETECT_SECONDS = 2.0
+# Three seconds, not two. Measured across all eleven supported languages,
+# two seconds identified ten of them but read Arabic as Hindi; three
+# identified every one. The extra second is paid once per session, not per
+# sentence.
+DETECT_SECONDS = 3.0
 _BYTES_PER_SAMPLE = 2
 _DETECT_BYTES = int(DETECT_SECONDS * SAMPLE_RATE_HZ * CHANNELS * _BYTES_PER_SAMPLE)
 

@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 
 from app.config import Settings
-from app.stt.auto import AutoDetectSttStream
+from app.stt.auto import DETECT_SECONDS, AutoDetectSttStream
 from app.stt.base import SttResult, SttStream
 from app.stt.detect import resolve_language
 
@@ -53,8 +53,23 @@ def test_chinese_is_normalised_to_the_one_tag_the_model_accepts(detected):
     assert resolve_language(detected) == "cmn-Hans-CN"
 
 
-def test_a_full_tag_is_passed_through():
+def test_a_full_tag_with_a_region_is_passed_through():
     assert resolve_language("en-GB") == "en-GB"
+
+
+@pytest.mark.parametrize(
+    "detected,expected",
+    [("ar-Latn", "ar-EG"), ("hi-Latn", "hi-IN"), ("ru-Cyrl", "ru-RU")],
+)
+def test_a_script_subtag_is_replaced_with_a_region(detected, expected):
+    # chirp_2 reports Arabic speech as "ar-Latn" as often as "ar". That is
+    # the right language in the wrong alphabet, and passing the script on
+    # to the streaming model would waste a correct detection.
+    assert resolve_language(detected) == expected
+
+
+def test_a_script_subtag_on_an_unsupported_language_still_falls_back():
+    assert resolve_language("xx-Latn") is None
 
 
 @pytest.mark.parametrize("detected", [None, "", "   ", "xx"])
@@ -95,8 +110,14 @@ def fake_google(monkeypatch):
     return FakeStream
 
 
-def one_second() -> bytes:
-    return b"\x00\x00" * 16_000
+def enough_to_detect() -> bytes:
+    """Just past the point where the wrapper stops buffering and detects.
+
+    Derived from DETECT_SECONDS rather than hard-coded, so tuning the
+    detection window cannot silently strand these tests below the
+    threshold, where results() would wait on a detection that never runs.
+    """
+    return b"\x00\x00" * int(16_000 * DETECT_SECONDS + 16_000)
 
 
 async def drain(stream: AutoDetectSttStream) -> list[SttResult]:
@@ -128,8 +149,7 @@ async def test_detected_language_pins_the_stream_and_tags_results(
     monkeypatch.setattr("app.stt.auto.detect_language", detects_korean)
     stream = AutoDetectSttStream(settings(stt_language="en-US"))
 
-    await stream.push(one_second())
-    await stream.push(one_second())
+    await stream.push(enough_to_detect())
     results = await drain(stream)
 
     assert stream.language == "ko-KR"
@@ -147,11 +167,11 @@ async def test_buffered_audio_is_replayed_so_the_opening_words_survive(
     monkeypatch.setattr("app.stt.auto.detect_language", detects)
     stream = AutoDetectSttStream(settings())
 
-    await stream.push(one_second())
-    await stream.push(one_second())
+    audio = enough_to_detect()
+    await stream.push(audio)
 
     pushed = fake_google.instances[0].pushed
-    assert b"".join(pushed) == one_second() * 2  # nothing lost, nothing reordered
+    assert b"".join(pushed) == audio  # nothing lost, nothing reordered
     # Google rejects a streaming chunk over 25 600 bytes, so the replay has
     # to be split; pushing the whole buffer at once fails the live stream.
     assert pushed and max(len(chunk) for chunk in pushed) <= 25_600
@@ -167,8 +187,7 @@ async def test_a_failed_detection_falls_back_instead_of_killing_the_session(
     monkeypatch.setattr("app.stt.auto.detect_language", explodes)
     stream = AutoDetectSttStream(settings(stt_language="ko-KR"))
 
-    await stream.push(one_second())
-    await stream.push(one_second())
+    await stream.push(enough_to_detect())
 
     assert stream.language == "ko-KR"
     assert fake_google.instances[0].settings.stt_language == "ko-KR"
@@ -184,8 +203,7 @@ async def test_an_unrecognised_language_falls_back_to_the_configured_one(
     monkeypatch.setattr("app.stt.auto.detect_language", detects_nothing)
     stream = AutoDetectSttStream(settings(stt_language="en-US"))
 
-    await stream.push(one_second())
-    await stream.push(one_second())
+    await stream.push(enough_to_detect())
 
     assert stream.language == "en-US"
 
