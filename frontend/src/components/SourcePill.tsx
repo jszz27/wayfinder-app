@@ -13,7 +13,7 @@ export function SourcePill({ source, onChange, locked }: SourcePillProps) {
   return (
     <div className="source-row">
       <span className="source-label" id="source-label">
-        음성 소스
+        Audio source
       </span>
       <div className="source-pill" role="radiogroup" aria-labelledby="source-label">
         <button
@@ -24,7 +24,7 @@ export function SourcePill({ source, onChange, locked }: SourcePillProps) {
           disabled={locked}
           onClick={() => onChange("mic")}
         >
-          마이크
+          Microphone
         </button>
         <button
           type="button"
@@ -34,9 +34,9 @@ export function SourcePill({ source, onChange, locked }: SourcePillProps) {
           // Tab audio capture lands with Plan.md section 9; the control is
           // shown now so the hierarchy is not rearranged later.
           disabled
-          title="재생 중인 오디오 캡처는 다음 스프린트에서 추가됩니다."
+          title="Capturing playing audio arrives in a later sprint."
         >
-          재생 중인 오디오
+          Playing audio
         </button>
       </div>
     </div>

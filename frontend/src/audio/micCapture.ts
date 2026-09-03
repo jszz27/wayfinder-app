@@ -81,13 +81,13 @@ export function describeMicError(error: unknown): string {
   switch (name) {
     case "NotAllowedError":
     case "SecurityError":
-      return "마이크 사용 권한이 거부되었습니다. 브라우저 주소창의 자물쇠 아이콘에서 마이크를 허용해 주세요.";
+      return "Microphone access was denied. Allow it from the lock icon in your browser's address bar.";
     case "NotFoundError":
     case "OverconstrainedError":
-      return "사용할 수 있는 마이크를 찾지 못했습니다. 마이크가 연결되어 있는지 확인해 주세요.";
+      return "No microphone was found. Check that one is connected.";
     case "NotReadableError":
-      return "마이크를 다른 프로그램이 사용 중입니다. 해당 프로그램을 닫고 다시 시도해 주세요.";
+      return "Another application is using the microphone. Close it and try again.";
     default:
-      return "마이크를 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.";
+      return "Could not start the microphone. Refresh the page and try again.";
   }
 }

@@ -30,7 +30,7 @@ export function CaptionPanel({ lines, fontSize, placeholder }: CaptionPanelProps
       ref={scrollRef}
       role="log"
       aria-live="polite"
-      aria-label="실시간 자막"
+      aria-label="Live captions"
     >
       {confirmed.length === 0 && !interim ? (
         <p className="caption-placeholder">{placeholder}</p>

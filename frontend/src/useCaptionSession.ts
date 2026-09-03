@@ -23,7 +23,7 @@ export interface CaptionLine {
 }
 
 // If the server never acknowledges end_stream, stop anyway rather than
-// leaving the button stuck on "중지 중".
+// leaving the button stuck on "Finishing up".
 const STREAM_END_TIMEOUT_MS = 3_000;
 
 export function useCaptionSession(source: AudioSource) {
@@ -100,7 +100,7 @@ export function useCaptionSession(source: AudioSource) {
       await teardown();
       setStatus("idle");
       statusRef.current = "idle";
-      setNotice(error instanceof Error ? error.message : "자막을 시작하지 못했습니다.");
+      setNotice(error instanceof Error ? error.message : "Could not start captions.");
     }
   }, [finish, handleConnectionChange, source, teardown]);
 

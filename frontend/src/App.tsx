@@ -8,11 +8,11 @@ import { useCaptionSession, type SessionStatus } from "./useCaptionSession";
 import type { AudioSource } from "./ws/protocol";
 
 const STATUS_TEXT: Record<SessionStatus, string> = {
-  idle: "시작을 누르면 마이크로 듣기 시작합니다.",
-  starting: "마이크를 준비하는 중…",
-  listening: "마이크로 듣는 중…",
-  reconnecting: "연결이 끊겨 다시 연결하는 중…",
-  stopping: "마무리하는 중…",
+  idle: "Press Start to begin listening through your microphone.",
+  starting: "Preparing the microphone…",
+  listening: "Listening through the microphone…",
+  reconnecting: "Connection lost. Reconnecting…",
+  stopping: "Finishing up…",
 };
 
 export default function App() {
@@ -39,14 +39,14 @@ export default function App() {
           <CaptionPanel
             lines={lines}
             fontSize={fontSize}
-            placeholder="자막이 여기에 표시됩니다."
+            placeholder="Captions will appear here."
           />
 
           {notice && (
             <div className="notice" role="alert">
               <span>{notice}</span>
               <button type="button" className="notice-dismiss" onClick={dismissNotice}>
-                닫기
+                Dismiss
               </button>
             </div>
           )}
@@ -57,13 +57,13 @@ export default function App() {
             onClick={() => void (running ? stop() : start())}
             disabled={status === "starting" || status === "stopping"}
           >
-            {running ? "중지" : "시작"}
+            {running ? "Stop" : "Start"}
           </button>
 
           <SettingsBar fontSize={fontSize} onFontSizeChange={setFontSize} />
         </>
       ) : (
-        <p className="placeholder-pane">디지털 가이드 모드는 다음 스프린트에서 추가됩니다.</p>
+        <p className="placeholder-pane">Digital guide mode arrives in a later sprint.</p>
       )}
     </main>
   );

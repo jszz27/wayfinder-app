@@ -19,8 +19,9 @@ Full product plan and specification: [`Plan.md`](./Plan.md).
 | — | PostgreSQL | Sprint 3 |
 | — | GitHub Actions / Cloud Run | Sprint 4 (`Dockerfile`s staged now) |
 
-Documentation is written in English to match `Plan.md`; the widget's
-user-facing strings are Korean, matching the default `STT_LANGUAGE=ko-KR`.
+Documentation and the widget's user-facing strings are both English.
+The language being *transcribed* is separate from the interface language
+and is set by `STT_LANGUAGE`.
 
 ## Running locally
 

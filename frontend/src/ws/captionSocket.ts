@@ -78,7 +78,7 @@ export class CaptionSocket {
         // Never connected in the first place: surface it instead of
         // silently retrying behind a "listening" label.
         this.handlers.onConnectionChange("closed");
-        onFirstFailure(new Error("자막 서버에 연결하지 못했습니다."));
+        onFirstFailure(new Error("Could not connect to the caption server."));
         return;
       }
       this.scheduleReconnect();

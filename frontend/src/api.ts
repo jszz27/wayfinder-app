@@ -13,11 +13,11 @@ export async function createCaptionSession(
     body: JSON.stringify({ audio_source: audioSource }),
   });
   if (!response.ok) {
-    throw new Error("자막 세션을 시작하지 못했습니다. 서버 상태를 확인해 주세요.");
+    throw new Error("Could not start a caption session. Check that the server is running.");
   }
   const body = (await response.json()) as { session_id?: unknown };
   if (typeof body.session_id !== "string") {
-    throw new Error("서버가 세션 정보를 제대로 돌려주지 않았습니다.");
+    throw new Error("The server did not return valid session details.");
   }
   return body.session_id;
 }
