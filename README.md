@@ -92,6 +92,14 @@ Windows but not on macOS, which cannot capture a native app's sound at
 all. And the choice cannot be remembered, so it has to be made every
 session.
 
+## Settings that follow you
+
+Text size and caption language are stored on the account, so they carry to
+another device rather than being set again each time -- which for a tool
+whose users need larger text is most of the point of having an account at
+all. `Plan.md` §6 had nowhere to keep them, so `users` gained the two
+columns.
+
 ## Accounts and saved transcripts
 
 Captioning and guide mode work with no account, and in that case nothing
