@@ -31,10 +31,9 @@ export function SourcePill({ source, onChange, locked }: SourcePillProps) {
           role="radio"
           className="source-segment"
           aria-checked={source === "tab_audio"}
-          // Tab audio capture lands with Plan.md section 9; the control is
-          // shown now so the hierarchy is not rearranged later.
-          disabled
-          title="Capturing playing audio arrives in a later sprint."
+          disabled={locked}
+          title="Caption the sound from a tab or screen you share"
+          onClick={() => onChange("tab_audio")}
         >
           Playing audio
         </button>

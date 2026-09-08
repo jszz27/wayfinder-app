@@ -126,4 +126,9 @@ again." Verified stable across repeated runs.
 Auth, JWT, and real `user_id` (§4, Sprint 3) · PostgreSQL persistence of
 `guide_sessions` and `guide_messages` (§6, Sprint 3) · TTS (§3 lists it,
 §12 does not put it in this sprint) · GitHub Actions and Cloud Run
-(Sprint 4) · LLM retry and fallback (Sprint 5) · `tab_audio` capture (§9).
+(Sprint 4) · LLM retry and fallback (Sprint 5).
+
+> `tab_audio` capture (§9) was listed here as out of scope, and in Sprint 1
+> before that. It is described in §3, §4, §5, §6, §8 and §9 but never
+> appears in the §12 sprint table, so it was designed and then never
+> scheduled. Built after Sprint 2 closed, once that gap was noticed.

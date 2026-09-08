@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { captionSocketUrl, createCaptionSession } from "./api";
+import { describeMicError, startMicCapture } from "./audio/micCapture";
+import type { AudioCapture } from "./audio/pcmCapture";
 import {
-  describeMicError,
-  startMicCapture,
-  type MicCapture,
-} from "./audio/micCapture";
+  describeTabAudioError,
+  startTabAudioCapture,
+} from "./audio/tabAudioCapture";
 import { CaptionSocket, type ConnectionState } from "./ws/captionSocket";
 import type { AudioSource } from "./ws/protocol";
 
@@ -33,7 +34,7 @@ export function useCaptionSession(source: AudioSource) {
   const [language, setLanguage] = useState<string | null>(null);
 
   const socketRef = useRef<CaptionSocket | null>(null);
-  const captureRef = useRef<MicCapture | null>(null);
+  const captureRef = useRef<AudioCapture | null>(null);
   const endTimerRef = useRef<number | null>(null);
   const statusRef = useRef<SessionStatus>("idle");
 
@@ -69,6 +70,18 @@ export function useCaptionSession(source: AudioSource) {
     }
   }, []);
 
+  const stop = useCallback(async () => {
+    if (statusRef.current === "idle" || statusRef.current === "stopping") return;
+    setStatus("stopping");
+    statusRef.current = "stopping";
+
+    await captureRef.current?.stop();
+    captureRef.current = null;
+    socketRef.current?.endStream();
+
+    endTimerRef.current = window.setTimeout(() => void finish(), STREAM_END_TIMEOUT_MS);
+  }, [finish]);
+
   const start = useCallback(async () => {
     if (statusRef.current !== "idle") return;
     setNotice(null);
@@ -91,10 +104,21 @@ export function useCaptionSession(source: AudioSource) {
       socketRef.current = socket;
       await socket.open();
 
+      const send = (pcm: ArrayBuffer) => socket.sendAudioChunk(pcm);
       try {
-        captureRef.current = await startMicCapture((pcm) => socket.sendAudioChunk(pcm));
+        captureRef.current =
+          source === "mic"
+            ? await startMicCapture(send)
+            : await startTabAudioCapture(send, () => {
+                // Sharing was stopped from the browser's own bar, so there
+                // is nothing left to caption. Finish rather than sit silent.
+                setNotice("Sharing stopped, so captioning has finished.");
+                void stop();
+              });
       } catch (error) {
-        throw new Error(describeMicError(error));
+        throw new Error(
+          source === "mic" ? describeMicError(error) : describeTabAudioError(error),
+        );
       }
 
       setStatus("listening");
@@ -105,19 +129,7 @@ export function useCaptionSession(source: AudioSource) {
       statusRef.current = "idle";
       setNotice(error instanceof Error ? error.message : "Could not start captions.");
     }
-  }, [finish, handleConnectionChange, source, teardown]);
-
-  const stop = useCallback(async () => {
-    if (statusRef.current === "idle" || statusRef.current === "stopping") return;
-    setStatus("stopping");
-    statusRef.current = "stopping";
-
-    await captureRef.current?.stop();
-    captureRef.current = null;
-    socketRef.current?.endStream();
-
-    endTimerRef.current = window.setTimeout(() => void finish(), STREAM_END_TIMEOUT_MS);
-  }, [finish]);
+  }, [finish, handleConnectionChange, source, stop, teardown]);
 
   return {
     status,

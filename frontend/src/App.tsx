@@ -11,12 +11,24 @@ import { useGuideSession } from "./guide/useGuideSession";
 import { useCaptionSession, type SessionStatus } from "./useCaptionSession";
 import type { AudioSource } from "./ws/protocol";
 
-const STATUS_TEXT: Record<SessionStatus, string> = {
-  idle: "Press Start to begin listening through your microphone.",
-  starting: "Preparing the microphone…",
-  listening: "Listening through the microphone…",
-  reconnecting: "Connection lost. Reconnecting…",
-  stopping: "Finishing up…",
+// Plan.md section 8: the status line changes with the chosen source,
+// because the two behave differently -- a microphone is granted once and
+// then simply listens, while playing audio has to be chosen every session.
+const STATUS_TEXT: Record<AudioSource, Record<SessionStatus, string>> = {
+  mic: {
+    idle: "Press Start to begin listening through your microphone.",
+    starting: "Preparing the microphone…",
+    listening: "Listening through the microphone…",
+    reconnecting: "Connection lost. Reconnecting…",
+    stopping: "Finishing up…",
+  },
+  tab_audio: {
+    idle: "Press Start, then choose the tab or screen you are listening to.",
+    starting: "Waiting for you to choose what to share…",
+    listening: "Listening to the shared audio…",
+    reconnecting: "Connection lost. Reconnecting…",
+    stopping: "Finishing up…",
+  },
 };
 
 function guideStatusText(sending: boolean, complete: boolean, sharing: boolean): string {
@@ -66,7 +78,7 @@ export default function App() {
           <SourcePill source={source} onChange={setSource} locked={running} />
           <div className="status-row">
             <p className="status-text" aria-live="polite">
-              {STATUS_TEXT[status]}
+              {STATUS_TEXT[source][status]}
             </p>
             {language && (
               <span className="language-chip" aria-live="polite">

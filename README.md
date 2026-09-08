@@ -64,6 +64,20 @@ Vertex AI, authenticating with the same credentials as speech-to-text.
 
 Issue checklist and evidence: [`docs/sprint-2.md`](./docs/sprint-2.md).
 
+## Captioning playing audio
+
+The "playing audio" source captions sound the user is already listening to
+-- a video with no captions, or automatic ones that are not good enough --
+by having the browser hand the audio over directly rather than holding a
+microphone up to the speakers (`Plan.md` §9).
+
+Three constraints come from the browser, not from this app. It is Chromium
+only. What can be shared depends on the platform: sharing a tab gives that
+tab's audio anywhere, while sharing a whole screen offers system audio on
+Windows but not on macOS, which cannot capture a native app's sound at
+all. And the choice cannot be remembered, so it has to be made every
+session.
+
 ## Saving a transcript
 
 "Save as text file" in caption mode downloads everything captioned so far
