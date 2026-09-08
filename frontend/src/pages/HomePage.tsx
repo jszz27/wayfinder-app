@@ -10,7 +10,7 @@ import { ScreenPill } from "../components/ScreenPill";
 import { SettingsBar, FONT_SIZES } from "../components/SettingsBar";
 import { SourcePill } from "../components/SourcePill";
 import { useGuideSession } from "../guide/useGuideSession";
-import { saveTranscript } from "../sessions/api";
+import { saveSessionText, saveTranscript } from "../sessions/api";
 import { useCaptionSession, type SessionStatus } from "../useCaptionSession";
 import type { AudioSource } from "../ws/protocol";
 
@@ -66,7 +66,11 @@ export function HomePage() {
   // existed and is still the default.
   const [language, setLanguage] = useState<string | null>(null);
   const [keeping, setKeeping] = useState(false);
-  const [kept, setKept] = useState(false);
+  // The entry this transcript was saved as, and the text that went into
+  // it. Saving again after carrying on updates that entry rather than
+  // making a second one holding a copy of the first.
+  const [keptAs, setKeptAs] = useState<string | null>(null);
+  const [keptText, setKeptText] = useState<string | null>(null);
   const [keepError, setKeepError] = useState<string | null>(null);
 
   const auth = useAccount();
@@ -108,16 +112,22 @@ export function HomePage() {
   };
 
   const forget = () => {
-    setKept(false);
+    setKeptAs(null);
+    setKeptText(null);
     setKeepError(null);
   };
 
   const keep = async () => {
+    const text = buildTranscript(lines);
     setKeeping(true);
     setKeepError(null);
     try {
-      await saveTranscript(source, buildTranscript(lines));
-      setKept(true);
+      if (keptAs === null) {
+        setKeptAs((await saveTranscript(source, text)).id);
+      } else {
+        await saveSessionText(keptAs, text);
+      }
+      setKeptText(text);
     } catch (error) {
       setKeepError(error instanceof Error ? error.message : "Could not save this text.");
     } finally {
@@ -127,6 +137,10 @@ export function HomePage() {
 
   const running = status !== "idle";
   const stopped = !running && lines.length > 0;
+  // Saving by hand is offered whenever there is something to save and
+  // nothing is saving it automatically.
+  const canKeep = signedIn && !autoSave && lines.length > 0;
+  const keptAlready = keptAs !== null && keptText === buildTranscript(lines);
   const guideSending = guide.status === "sending";
   const guideComplete = guide.status === "complete";
 
@@ -192,15 +206,16 @@ export function HomePage() {
           Stop
         </button>
       ) : stopped ? (
-        /* Stopping with a transcript on screen is a fork, not an end.
-           Reset only clears -- it does not start listening, because
+        /* Stopping with a transcript on screen is a fork, not an end:
+           carry on after it, or clear it and be back at the beginning.
+           Both sit where Stop was, so the choice is where the eye already
+           is. Reset only clears -- it does not start listening, because
            discarding a transcript and deciding to record again are two
            decisions, not one.
 
-           What sits beside it depends on where the words are going. With
-           auto-save on they are already in the account, so the offer is to
-           carry on adding to that same entry. With auto-save off nothing
-           has been written anywhere yet, so the offer is to write it. */
+           Carrying on is offered whether or not anything is being saved.
+           Where the words go afterwards is a separate question, answered
+           by the auto-save setting and by the button below. */
         <div className="button-row">
           <button
             type="button"
@@ -212,24 +227,13 @@ export function HomePage() {
           >
             Reset
           </button>
-          {signedIn && !autoSave ? (
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => void keep()}
-              disabled={keeping || kept}
-            >
-              {kept ? "Saved to your account" : keeping ? "Saving…" : "Save to my account"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => void start(true)}
-            >
-              Continue
-            </button>
-          )}
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => void start(true)}
+          >
+            Continue
+          </button>
         </div>
       ) : (
         <button
@@ -241,6 +245,27 @@ export function HomePage() {
           }}
         >
           Start
+        </button>
+      )}
+
+      {/* With auto-save off nothing is written until this is pressed.
+          It sits with the other way of keeping a transcript rather than in
+          the button row, so that stopping always offers the same two
+          choices and this stays a separate decision. */}
+      {canKeep && (
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => void keep()}
+          disabled={keeping || keptAlready}
+        >
+          {keptAlready
+            ? "Saved to your account"
+            : keeping
+              ? "Saving…"
+              : keptAs !== null
+                ? "Save the rest to my account"
+                : "Save to my account"}
         </button>
       )}
 

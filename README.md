@@ -137,6 +137,11 @@ instead of starting a second one. Off, nothing is written anywhere until
 "Save to my account" is pressed -- the browser makes its own session id
 and never asks for a row, so there is nowhere for the words to go.
 
+Stopping offers Reset and Continue either way. Carrying on is a question
+about the recording; auto-save is a question about where the words go, and
+the two are unrelated. Saving by hand twice updates the one entry rather
+than leaving a second with the first one's text inside it.
+
 ## Accounts and saved transcripts
 
 Captioning and guide mode work with no account, and in that case nothing

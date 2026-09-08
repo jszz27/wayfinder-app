@@ -39,7 +39,7 @@ export function ConversationsPage() {
   return (
     <div className="page">
       <Link className="account-link" to="/">
-        &larr; Live captions
+        &larr; Back to the main page
       </Link>
 
       <h1 className="page-title">Guide conversations</h1>

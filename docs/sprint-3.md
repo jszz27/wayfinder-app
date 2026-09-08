@@ -94,6 +94,20 @@ than cosmetic:
   as for an anonymous listener. The text exists only in the tab until the
   user presses Save.
 
+Stopping offers the same two choices either way — Reset and Continue —
+because carrying on is a question about the recording and auto-save is a
+question about where the words go. The first draft made Save *replace*
+Continue when auto-save was off, which quietly removed the ability to
+carry on from the people who had turned saving off, and was corrected.
+Saving by hand sits with "Save as text file" instead, where the other
+"keep this" action already was.
+
+Saving twice updates one entry rather than making a second. Save, then
+Continue, then Save again would otherwise leave two entries with the first
+one's text duplicated inside the second, so the first save keeps its id
+and later ones `PATCH` it — the same promise Continue makes with auto-save
+on, kept on the manual path too.
+
 This is why "off" needed no new request field and no flag on the socket:
 *not creating the row* is the whole implementation, and it reuses a path
 that already had to be right.
@@ -258,9 +272,15 @@ wanted the corrected version.
 
 The request called the manual control a "Save button". It is labelled
 **"Save to my account"**, because it sits next to "Save as text file" and
-plain "Save" beside that would have been a coin toss. Reset is shown with
-auto-save on as well as off, since it was asked for in Sprint 2 and
-removing it when the preference changed would have been a regression.
+plain "Save" beside that would have been a coin toss. Once something has
+been saved and the recording carried on, it reads "Save the rest to my
+account", which is what the button now does.
+
+The request also said Save should *replace* Continue when auto-save is
+off. Built that way first, then corrected on feedback: it took carrying on
+away from exactly the people who had turned saving off, for no reason —
+the two decisions are unrelated. Reset and Continue are now the same pair
+in both modes.
 
 ---
 
@@ -288,6 +308,8 @@ removing it when the preference changed would have been a regression.
 - [x] The language menu offers the eleven supported languages plus "Detect automatically"
 - [x] A pinned language reaches the recogniser and turns detection off
 - [x] Auto-save is exposed rather than hidden, because it decides whether speech is kept at all
+- [x] Stopping offers Reset and Continue whether auto-save is on or off
+- [x] Saving by hand twice updates one entry rather than making a second
 
 ### Issue 13 — Saved text `backend-rest` `frontend`
 - [x] `GET /api/caption-sessions` lists mine, newest first
@@ -337,7 +359,8 @@ removing it when the preference changed would have been a regression.
 | Drift guard actually guards | Run twice for repeatability, then a model deliberately broken to confirm it still fails |
 | Continue extends one entry | Real microphone: Start, Stop, Continue, Stop produced one row, 14 lines, seqs 0–13, no gaps, from two streams of 5 and 9 |
 | Continue's fix is the fix | Old code restored: first two lines destroyed, only the last two remained |
-| Auto-save off | Stop offered Reset and Save; the save landed; the button then locked against a second |
+| Auto-save off | Stop offered Reset, Continue and Save; the save landed; the button locked against a second |
+| Saving twice keeps one entry | Save, Continue, Save again: one entry holding all 19 lines, not two with the first duplicated inside the second |
 | Pinned language on the wire | Server log: `?session_id=…&language=ko-KR` pinned, no parameter at all on "Detect automatically" |
 | Pinning is not advisory | `stt_auto_detect` forced back on: `test_pinning_turns_detection_off` fails |
 | Stream auth stops the attack | Script streaming into a victim's session id with no token: transcript stayed at 5 lines |
