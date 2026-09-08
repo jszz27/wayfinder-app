@@ -1,0 +1,121 @@
+# Plan.md section 12, Sprint 4: the checks that have to pass before
+# anything is deployed.
+#
+# Three jobs rather than one, because they fail for unrelated reasons and
+# a red build should say which half of the system is broken without
+# anyone opening the log.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # So the pipeline can be exercised without pushing something to prove it.
+  workflow_dispatch:
+
+# A second push to the same branch makes the first one's answer worthless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend-rest:
+    name: REST API
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # The version the project develops against; a schema that only
+        # works on a different major is a deployment surprise.
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    env:
+      # tests/conftest.py rewrites this to wayfinder_test and refuses to
+      # run if it cannot, so the name here is the one it starts from.
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/wayfinder
+      # Signing key for this run only. Real ones live in Secret Manager.
+      JWT_SECRET: ci-only-not-a-real-secret-ci-only-not-a-real-secret
+      WAYFINDER_LLM: mock
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend-rest/pyproject.toml
+
+      - name: Create the test database
+        # The suite builds the schema; it does not create the database.
+        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE wayfinder_test"
+
+      - name: Install
+        working-directory: backend-rest
+        run: pip install -e ".[dev]"
+
+      - name: Test
+        working-directory: backend-rest
+        run: pytest -q
+
+  backend-ws:
+    name: WebSocket server
+    runs-on: ubuntu-latest
+
+    env:
+      WAYFINDER_STT: mock
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend-ws/pyproject.toml
+
+      - name: Install
+        working-directory: backend-ws
+        # Without [google]: this suite runs against the mock adapter, and
+        # pulling the cloud SDK in would only slow it down.
+        run: pip install -e ".[dev]"
+
+      - name: Test
+        working-directory: backend-ws
+        run: pytest -q
+
+  frontend:
+    name: Widget
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type-check and build
+        # `npm run build` is `tsc --noEmit && vite build`, so this is the
+        # type check and the bundle in one step.
+        working-directory: frontend
+        run: npm run build
