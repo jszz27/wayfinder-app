@@ -24,6 +24,7 @@ from app.protocol import (
     StreamEndedMessage,
     client_message_adapter,
 )
+from app.store import CaptionStore
 from app.stt.base import SttStream
 
 logger = logging.getLogger(__name__)
@@ -33,11 +34,19 @@ _UNRECOGNISED = "Unrecognised message; expected audio_chunk or end_stream."
 
 class CaptionStreamSession:
     def __init__(
-        self, websocket: WebSocket, session_id: str, stt: SttStream
+        self,
+        websocket: WebSocket,
+        session_id: str,
+        stt: SttStream,
+        store: CaptionStore | None = None,
     ) -> None:
         self._websocket = websocket
         self._session_id = session_id
         self._stt = stt
+        # Absent when captions are not being saved, which is the ordinary
+        # case: only a signed-in listener's session has a row to write to.
+        self._store = store
+        self._language: str | None = None
         # Caption line ordinal, shared by every interim result for the
         # line being formed and incremented once it is confirmed. See
         # docs/sprint-1.md for why caption.seq is read this way.
@@ -45,6 +54,8 @@ class CaptionStreamSession:
         self._failed = False
 
     async def run(self) -> None:
+        if self._store is not None:
+            await self._store.open()
         forward = asyncio.create_task(self._forward_captions())
         try:
             await self._receive_loop()
@@ -66,6 +77,9 @@ class CaptionStreamSession:
             logger.exception("caption session %s failed while draining", self._session_id)
             await self._fail("Speech recognition stopped unexpectedly.")
             return
+
+        if self._store is not None:
+            await self._store.finish(self._language)
 
         await self._send(StreamEndedMessage(session_id=self._session_id))
         with contextlib.suppress(RuntimeError):
@@ -109,7 +123,13 @@ class CaptionStreamSession:
                         language=result.language,
                     )
                 )
+                if result.language:
+                    self._language = result.language
                 if result.is_final:
+                    # Only confirmed sentences are written down
+                    # (Plan.md section 5); interim text is still being revised.
+                    if self._store is not None:
+                        await self._store.add_line(self._line_seq, result.text)
                     self._line_seq += 1
         except Exception:
             # Surface it now: the receive loop is blocked on the socket and

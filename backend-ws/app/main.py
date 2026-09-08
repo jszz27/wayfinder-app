@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.protocol import ErrorMessage
 from app.session import CaptionStreamSession
+from app.store import CaptionStore
 from app.stt.factory import create_stt_stream
 
 logger = logging.getLogger(__name__)
@@ -64,4 +65,5 @@ async def caption_stream(
         await websocket.close()
         return
 
-    await CaptionStreamSession(websocket, session_id, stt).run()
+    store = CaptionStore(get_settings(), session_id)
+    await CaptionStreamSession(websocket, session_id, stt, store).run()

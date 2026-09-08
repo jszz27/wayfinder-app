@@ -92,6 +92,21 @@ Windows but not on macOS, which cannot capture a native app's sound at
 all. And the choice cannot be remembered, so it has to be made every
 session.
 
+## Accounts and saved transcripts
+
+Captioning and guide mode work with no account, and in that case nothing
+is stored: `POST /api/caption-sessions` returns an id but writes no row,
+so `backend-ws` finds none and never writes the transcript down. Signing
+in is what turns saving on.
+
+That is why the WebSocket server holds its own database connection. The
+captions exist only there, so it is the only thing positioned to write
+them, and looking for the session's row is how it learns whether it should
+(`Plan.md` §3's diagram shows only the REST server touching the database;
+this amends it). Its access is narrow -- find the row, append confirmed
+lines, stamp the session finished -- and the schema and migrations belong
+to `backend-rest`.
+
 ## Saving a transcript
 
 "Save as text file" in caption mode downloads everything captioned so far

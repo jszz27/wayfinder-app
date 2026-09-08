@@ -35,6 +35,9 @@ class Settings:
     google_location: str
     google_detect_location: str
     cors_origins: tuple[str, ...]
+    # Empty means captions are not saved at all, which is how this service
+    # runs with no database in front of it.
+    database_url: str
 
 
 @lru_cache(maxsize=1)
@@ -51,4 +54,5 @@ def get_settings() -> Settings:
         # Language detection needs a regional endpoint; "global" has no chirp_2.
         google_detect_location=os.getenv("GOOGLE_DETECT_LOCATION", "us-central1"),
         cors_origins=origins,
+        database_url=os.getenv("DATABASE_URL", ""),
     )

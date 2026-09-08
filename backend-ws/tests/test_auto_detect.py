@@ -29,6 +29,8 @@ def settings(**overrides) -> Settings:
         google_location="global",
         google_detect_location="us-central1",
         cors_origins=("http://localhost:5173",),
+        # No database, so nothing this test does is written down.
+        database_url="",
     )
     return Settings(**{**base, **overrides})
 
