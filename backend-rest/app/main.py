@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import caption_sessions, guide_sessions
+from app.routers import auth, caption_sessions, guide_sessions
 
 app = FastAPI(title="Wayfinder REST API", version="0.1.0")
 
@@ -24,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(caption_sessions.router)
+app.include_router(auth.router)
 app.include_router(guide_sessions.router)
 
 

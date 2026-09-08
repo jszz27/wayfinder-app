@@ -23,6 +23,14 @@ class Settings:
 
     cors_origins: tuple[str, ...]
 
+    # PostgreSQL (Plan.md section 6). backend-rest owns the schema.
+    database_url: str
+    # Signing key for access and refresh tokens. Anyone holding it can mint
+    # a token for any account, so it never has a usable default.
+    jwt_secret: str
+    access_token_minutes: int
+    refresh_token_days: int
+
     # Guide mode (Plan.md section 4). "mock" needs no cloud project.
     llm_backend: str
     google_project: str | None
@@ -37,6 +45,12 @@ def get_settings() -> Settings:
     origins = tuple(origin.strip() for origin in raw.split(",") if origin.strip())
     return Settings(
         cors_origins=origins,
+        database_url=os.getenv("DATABASE_URL", ""),
+        jwt_secret=os.getenv("JWT_SECRET", ""),
+        # Short-lived, because an access token cannot be withdrawn; the
+        # refresh token is the one that can be revoked at logout.
+        access_token_minutes=int(os.getenv("ACCESS_TOKEN_MINUTES", "15")),
+        refresh_token_days=int(os.getenv("REFRESH_TOKEN_DAYS", "30")),
         llm_backend=os.getenv("WAYFINDER_LLM", "mock").lower(),
         google_project=os.getenv("GOOGLE_CLOUD_PROJECT"),
         # Gemini is served from regional endpoints; "global" also works but
