@@ -148,6 +148,12 @@ cd backend-rest; pytest
 cd frontend;     npm run build    # type-check + bundle
 ```
 
+The REST tests need PostgreSQL. They run against `wayfinder_test`, never
+the development database: `tests/conftest.py` rewrites `DATABASE_URL` to
+that name before the app can read it and refuses to start otherwise, since
+the schema is dropped and rebuilt for each test. Create it once with
+`CREATE DATABASE wayfinder_test OWNER wayfinder;`.
+
 ## Sprint log
 
 Per `Plan.md` §12, each sprint closes with a short retrospective here.
