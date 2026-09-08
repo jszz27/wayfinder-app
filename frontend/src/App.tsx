@@ -102,14 +102,44 @@ export default function App() {
             </div>
           )}
 
-          <button
-            type="button"
-            className={running ? "primary-button is-running" : "primary-button"}
-            onClick={() => void (running ? stop() : start())}
-            disabled={status === "starting" || status === "stopping"}
-          >
-            {running ? "Stop" : "Start"}
-          </button>
+          {running ? (
+            <button
+              type="button"
+              className="primary-button is-running"
+              onClick={() => void stop()}
+              disabled={status === "starting" || status === "stopping"}
+            >
+              Stop
+            </button>
+          ) : lines.length > 0 ? (
+            /* Stopping with a transcript on screen is a fork, not an end:
+               carry on after it, or throw it away and begin again. Both
+               sit where Stop was, so the choice is where the eye already is. */
+            <div className="button-row">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void start(false)}
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => void start(true)}
+              >
+                Continue
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => void start(false)}
+            >
+              Start
+            </button>
+          )}
 
           {/* Keeping what was said is the other half of being able to
               follow it, so this stays available while listening too. */}

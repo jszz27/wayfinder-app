@@ -282,6 +282,21 @@ body {
   font-size: 15px;
 }
 
+/* Reset and Continue occupy the space Stop just vacated. Continue is the
+   likelier intent, so it keeps the primary weight and the wider share. */
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.button-row .secondary-button {
+  flex: 1 1 0;
+}
+
+.button-row .primary-button {
+  flex: 2 1 0;
+}
+
 .secondary-button {
   padding: 10px;
   font-size: 14px;
