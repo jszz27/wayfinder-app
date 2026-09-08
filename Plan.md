@@ -61,7 +61,10 @@ GitHub Actions → Cloud deployment (GCP Cloud Run) → deploys REST/WebSocket s
 - `POST /api/guide/sessions` — Start a guide session
 - `POST /api/guide/sessions/{session_id}/messages` — Send a situation description → get the AI's next-step response. Body includes the text question plus an optional `screenshot: "<base64 image>"` (included only while screen sharing is on)
 - `GET /api/guide/sessions/{session_id}` — Get conversation history
+- `GET /api/guide/sessions` — List my conversations *(added in Sprint 3)*
 - `PATCH /api/guide/sessions/{session_id}/complete` — Mark the session complete
+
+> **`GET /api/guide/sessions` was added in Sprint 3.** Caption sessions had a list from the start and guide sessions did not, which meant a signed-in user's conversations were stored and unreachable: reading one needs an id, and nothing handed out ids once the tab had closed. Data kept and never shown is worse than data not kept. See `docs/sprint-3.md`.
 
 **User settings**
 - `GET /api/users/me` — Get profile/settings

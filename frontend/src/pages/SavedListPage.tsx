@@ -3,6 +3,7 @@ import { Link, Navigate } from "react-router-dom";
 
 import { useAccount } from "../auth/AuthProvider";
 import { downloadText, savedFilename } from "../captions/transcript";
+import { SavedNav } from "../components/SavedNav";
 import {
   deleteSession,
   getSession,
@@ -84,6 +85,7 @@ export function SavedListPage() {
       </Link>
 
       <h1 className="page-title">Saved text</h1>
+      <SavedNav here="text" />
 
       {error && (
         <div className="notice" role="alert">

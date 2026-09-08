@@ -89,3 +89,26 @@ export async function getGuideSession(sessionId: string): Promise<GuideSession> 
   }
   return (await response.json()) as GuideSession;
 }
+
+// --- reading conversations back ---------------------------------------
+//
+// `GET /api/guide/sessions` is not in Plan.md section 4 as written; it was
+// added in Sprint 3, because until then a signed-in user's conversations
+// were stored and unreachable.
+
+export interface SavedConversation {
+  id: string;
+  started_at: string;
+  completed_at: string | null;
+  /** The first thing they asked, which is what makes one recognisable. */
+  opening: string | null;
+  exchanges: number;
+}
+
+export async function listConversations(): Promise<SavedConversation[]> {
+  const response = await fetch(`${REST_BASE}/api/guide/sessions`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error("Could not load your conversations.");
+  return (await response.json()) as SavedConversation[];
+}

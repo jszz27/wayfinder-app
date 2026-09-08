@@ -385,6 +385,30 @@ body {
 
 /* --- saved text ------------------------------------------------------ */
 
+/* Two kinds of kept thing behind one header button, because "what have I
+   saved" is one question -- the answer just has two halves. */
+.saved-nav {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.saved-nav-link {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.saved-nav-link:hover {
+  text-decoration: underline;
+}
+
+.saved-nav-here {
+  font-weight: 700;
+  color: var(--text);
+}
+
 .saved-list {
   display: flex;
   flex-direction: column;

@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.auth.dependencies import CurrentUserOrNone, Db
+from app.auth.dependencies import CurrentUser, CurrentUserOrNone, Db
 from app.config import get_settings
 from app.db.models import GuideMessage, GuideSession
 from app.guide.base import GuideTurn
@@ -110,6 +110,21 @@ class GuideSessionResponse(BaseModel):
     started_at: datetime
     completed_at: datetime | None
     messages: list[GuideMessageResponse]
+
+
+class GuideSessionSummary(BaseModel):
+    """One conversation as it appears in a list.
+
+    `opening` is the first thing the person asked. A conversation has no
+    name and nobody would want to give one to "how do I send money?", so
+    the question itself is what makes one recognisable a week later.
+    """
+
+    id: str
+    started_at: datetime
+    completed_at: datetime | None
+    opening: str | None
+    exchanges: int
 
 
 # --- screenshot -------------------------------------------------------
@@ -230,6 +245,43 @@ async def create_guide_session(
     db.add(session)
     await db.flush()
     return CreateGuideSessionResponse(session_id=str(session.id), saved=True)
+
+
+@router.get("", response_model=list[GuideSessionSummary])
+async def list_guide_sessions(db: Db, user: CurrentUser) -> list[GuideSessionSummary]:
+    """List my conversations, most recent first.
+
+    Not in Plan.md section 4 as written; added in Sprint 3 alongside the
+    saved text pages. Without it a signed-in user's conversations were
+    stored and unreachable -- the endpoint to read one needs an id, and
+    nothing handed out ids after the tab was closed.
+
+    Anonymous conversations cannot appear here and are not looked for:
+    they are held in this process, belong to nobody, and are forgotten.
+    """
+    rows = (
+        await db.scalars(
+            select(GuideSession)
+            .where(GuideSession.user_id == user.id)
+            .order_by(GuideSession.started_at.desc())
+            .options(selectinload(GuideSession.messages))
+        )
+    ).all()
+    return [_summary(row) for row in rows]
+
+
+def _summary(session: GuideSession) -> GuideSessionSummary:
+    asked = [m for m in session.messages if m.role == "user"]
+    return GuideSessionSummary(
+        id=str(session.id),
+        started_at=session.started_at,
+        completed_at=session.completed_at,
+        opening=asked[0].content if asked else None,
+        # Counted in questions rather than messages, because "4 messages"
+        # for two questions and two answers reads as twice the
+        # conversation it was.
+        exchanges=len(asked),
+    )
 
 
 @router.post(

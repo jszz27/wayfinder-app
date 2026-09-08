@@ -2,6 +2,8 @@ import { Link, Outlet, RouterProvider, createBrowserRouter } from "react-router-
 
 import { AuthProvider } from "./auth/AuthProvider";
 import { Header } from "./components/Header";
+import { ConversationPage } from "./pages/ConversationPage";
+import { ConversationsPage } from "./pages/ConversationsPage";
 import { HomePage } from "./pages/HomePage";
 import { SavedListPage } from "./pages/SavedListPage";
 import { SessionDetailPage } from "./pages/SessionDetailPage";
@@ -10,8 +12,8 @@ import { SignUpPage } from "./pages/SignUpPage";
 
 // Plan.md section 8 was amended in Sprint 3: captioning and guide mode are
 // still one widget behind two tabs, and the pages added here are the ones
-// that could not be a panel inside it -- a list of saved text, and one
-// session's own text, which has to be somewhere a link can point at.
+// that could not be a panel inside it -- what an account has kept, and one
+// kept thing, which has to be somewhere a link can point at.
 //
 // A data router rather than <BrowserRouter>, because useBlocker only
 // exists on this one, and stopping someone from navigating away from
@@ -47,6 +49,8 @@ const router = createBrowserRouter([
       { path: "/signup", element: <SignUpPage /> },
       { path: "/saved", element: <SavedListPage /> },
       { path: "/saved/:id", element: <SessionDetailPage /> },
+      { path: "/conversations", element: <ConversationsPage /> },
+      { path: "/conversations/:id", element: <ConversationPage /> },
       { path: "*", element: <NotFound /> },
     ],
   },

@@ -264,6 +264,93 @@ removing it when the preference changed would have been a regression.
 
 ---
 
+## Issues
+
+### Issue 10 — Accounts and tokens `backend-rest`
+- [x] `POST /api/auth/signup` creates an account and returns tokens
+- [x] `POST /api/auth/login` answers identically for a wrong password and an unknown email
+- [x] `POST /api/auth/refresh` rotates the refresh token
+- [x] `DELETE /api/auth/logout` revokes it, so a signed token can be withdrawn
+- [x] Access tokens are short-lived JWTs; refresh tokens are opaque and stored only as a SHA-256 hash
+- [x] Passwords are argon2; a login rehashes when the parameters have moved on
+- [x] Email is lower-cased on the way in
+
+### Issue 11 — Schema and migrations `backend-rest`
+- [x] All six tables of §6, plus `refresh_tokens`
+- [x] `caption_sessions.user_id` is `NOT NULL`, so an anonymous session cannot have a row
+- [x] Alembic migrations, with a test that fails when the models and the migrations disagree
+- [x] Deleting an account takes its sessions, lines and conversations with it
+
+### Issue 12 — Settings that follow the account `backend-rest` `frontend`
+- [x] `GET`/`PATCH /api/users/me` for `font_size`, `caption_language`, `auto_save`
+- [x] Partial update in the real sense: sending null clears, omitting leaves alone
+- [x] Text size applies on load and is saved as it changes
+- [x] The language menu offers the eleven supported languages plus "Detect automatically"
+- [x] A pinned language reaches the recogniser and turns detection off
+- [x] Auto-save is exposed rather than hidden, because it decides whether speech is kept at all
+
+### Issue 13 — Saved text `backend-rest` `frontend`
+- [x] `GET /api/caption-sessions` lists mine, newest first
+- [x] `POST /api/caption-sessions/saved` keeps a transcript the widget was holding
+- [x] `PATCH /api/caption-sessions/{id}` renames or corrects, without one discarding the other
+- [x] `DELETE /api/caption-sessions/{id}` removes a session and its lines
+- [x] `caption_lines` is never rewritten by an edit
+- [x] Another person's session is 404, never 403
+- [x] `/saved` lists, renames, downloads and deletes; `/saved/:id` reads and corrects
+- [x] Unsaved edits block navigation and the tab close, and offer to save before a download
+
+### Issue 14 — Continuing a recording `backend-ws` `frontend`
+- [x] Continue reopens the same session rather than starting a second entry
+- [x] Stored line numbers resume after what is already written
+- [x] A reconnect appends rather than overwriting the start of the transcript
+
+### Issue 15 — Whose stream it is `backend-ws` `frontend`
+- [x] `auth` frame carrying an access token (§5, amended)
+- [x] Optional and first-or-not-at-all; a late frame errors without dropping the stream
+- [x] A token that does not verify is refused with one `error` and close 1008
+- [x] The store matches on `user_id`, so another person's id writes nothing
+- [x] No `JWT_SECRET` means every token is refused rather than accepted unchecked
+- [x] Reconnects re-authenticate with a freshly fetched token
+- [x] The token appears in no access log
+
+### Issue 16 — Conversations that can be read back `backend-rest` `frontend`
+- [x] `GET /api/guide/sessions` lists mine (§4, amended)
+- [x] Named by the first question asked, counted in questions rather than messages
+- [x] Anonymous conversations never appear, because they belong to nobody
+- [x] `/conversations` and `/conversations/:id` behind the same header button as saved text
+
+### Issue 17 — Pages `frontend`
+- [x] `react-router` data router; §8 amended and the reasoning recorded
+- [x] Confirm-password on signup, refused before the request is sent
+- [x] Creating an account redirects to sign in rather than signing in
+- [x] "Saved Text List" sits to the left of "Sign out" in the header
+- [x] The way back is the first thing on every page, always one level up
+
+---
+
+## Verification evidence
+
+| Check | Evidence |
+|---|---|
+| Whole suite | 119 passed in `backend-rest`, 96 in `backend-ws`; frontend build clean |
+| Migration against real data | `alembic upgrade head` on the populated development database: failed with `NotNullViolationError`, rolled back cleanly, fixed, re-run, existing row adopted `true` |
+| Drift guard actually guards | Run twice for repeatability, then a model deliberately broken to confirm it still fails |
+| Continue extends one entry | Real microphone: Start, Stop, Continue, Stop produced one row, 14 lines, seqs 0–13, no gaps, from two streams of 5 and 9 |
+| Continue's fix is the fix | Old code restored: first two lines destroyed, only the last two remained |
+| Auto-save off | Stop offered Reset and Save; the save landed; the button then locked against a second |
+| Pinned language on the wire | Server log: `?session_id=…&language=ko-KR` pinned, no parameter at all on "Detect automatically" |
+| Pinning is not advisory | `stt_auto_detect` forced back on: `test_pinning_turns_detection_off` fails |
+| Stream auth stops the attack | Script streaming into a victim's session id with no token: transcript stayed at 5 lines |
+| The attack was real | Old store code restored: the same script took it from 5 lines to 8 |
+| Only the owner writes | Four callers at the store — owner, stranger, anonymous, bogus id — one write; old code let all four through |
+| The token is not logged | Zero occurrences in the WebSocket access log after a signed-in recording |
+| Unsaved-changes guards | In-app navigation blocked with the exact wording; download offered save first; both dialogs read from the accessibility tree |
+| Downloaded file | Byte-inspected: `efbbbf` BOM, title-derived filename, content including the saved edit |
+| Signup does not sign in | Mismatched confirmation refused before the request; matching one landed on `/signin` with the header still signed out |
+| Conversations reachable | Seeded two turns, listed at `/conversations` named by the opening question, opened and both turns rendered |
+
+---
+
 ## Bugs worth remembering
 
 ### The migration that would have passed every test and failed every deploy
@@ -306,50 +393,37 @@ so a mistake here cannot reach the development database.
 
 ## What is tested, and what is not
 
-**204 automated tests** — 108 REST, 96 WebSocket. The editing rules have
-their own file, `test_caption_sessions_editing.py`, whose point is the
-property above: renaming cannot discard an edit, editing cannot discard a
-name, and neither ever rewrites `caption_lines`.
+**215 automated tests** — 119 REST, 96 WebSocket. Two files exist for a
+property rather than an endpoint: `test_caption_sessions_editing.py`, for
+renaming and editing never discarding each other or rewriting
+`caption_lines`; and `test_stream_auth.py`, for a stream having to say
+whose it is. Both were re-broken on purpose to confirm they fail.
 
-Verified by hand in a browser against live servers on clean ports:
-signup with a mismatched confirmation (refused before it is sent) and a
-matching one (redirected to sign in, not signed in), sign in, the header,
-the saved list, rename, delete, download, editing, both prompts, and both
-preferences reaching the account. The downloaded file was checked byte by
-byte for its BOM.
+The evidence table above is the run-by-run detail. What no automated test
+covers is the live recording path — it needs a microphone — so that was
+exercised by hand, and the WebSocket store has no test database at all, so
+its two changes were checked with scripts against the real one.
 
-The recording path was exercised end to end with a real microphone:
+### The privacy model failing safe, mistaken for a bug
 
-- **Auto-save on.** Start, Stop, Continue, Stop produced **one** session
-  row holding 14 lines numbered 0-13 with no gaps and no overwrites, from
-  two separate streams of 5 and 9 — which is the whole claim Continue
-  makes.
-- **Auto-save off.** Stop offered Reset and Save rather than Continue, the
-  save landed in the account, and the button then locked itself against a
-  second one.
-- **Language.** With Korean pinned the socket opened as
-  `?session_id=…&language=ko-KR`; with "Detect automatically" it opened
-  with no parameter at all. Both read from the server's own log. The menu,
-  the source pill and the auto-save toggle all lock while a stream is open.
+During the microphone run, `backend-ws` was first started without
+`DATABASE_URL`. It fell back to `.env`, looked for the session in the
+*development* database, found nothing, and correctly wrote nothing. The
+zero-line result looked exactly like a bug for a minute.
 
-One thing to know about that run: backend-ws was first started without
-`DATABASE_URL`, so it fell back to `.env` and looked for the session in
-the *development* database, found nothing, and correctly wrote nothing.
-The zero-line result was the privacy model working, not a bug — but it is
-a good illustration of how quietly "no row, no transcript" fails safe, and
-of why the two services must be pointed at the same database.
+It is worth keeping because it shows the cost of the design as well as its
+value: "no row, no transcript" fails closed and says nothing, which is the
+right behaviour for privacy and an actively misleading one for an operator
+who has misconfigured a service. If this ever runs somewhere real, a
+signed-in session that finds no row deserves a log line at warning level.
 
-The stream authentication was demonstrated by attack, not by assertion.
-A script opened a socket on a signed-in user's session id, with no token,
-and pushed enough audio for three confirmed lines:
+---
 
-- **With the fix**: the attacker received its own captions — anonymous
-  captioning still works — and the victim's transcript stayed at 5 lines.
-- **With the old code restored**: the same script took the transcript from
-  5 lines to 8. The attacker's words were in someone else's saved text.
+## Out of scope this sprint
 
-The same pair of runs was done at the store level with four callers — the
-owner, a stranger, an anonymous listener and a bogus user id. Only the
-owner could write; the old code let all four through. And the access log
-was checked afterwards for the token: zero occurrences, which was the
-whole reason it travels in a frame.
+`DELETE /api/guide/sessions/{id}` — conversations can be read but not
+removed, which is an asymmetry with caption sessions · The 106 untested
+language pairs carried from Sprint 2 · TTS (§3 lists it, §12 places it in
+no sprint) · GitHub Actions and Cloud Run (Sprint 4) · STT and LLM retry
+and fallback (Sprint 5) · Moving tokens from `localStorage` to httpOnly
+cookies, which is the hardening if this ever leaves a portfolio.
