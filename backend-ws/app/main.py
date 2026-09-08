@@ -3,7 +3,9 @@
 Endpoint and message set follow Plan.md section 5:
     ws://<host>/ws/caption?session_id={session_id}[&language={tag}]
 
-`language` was added in Sprint 3; see docs/sprint-3.md.
+`language` and the `auth` frame were both added in Sprint 3; see
+docs/sprint-3.md. The token is a message rather than a query parameter
+because query strings are written to every access log.
 """
 
 from __future__ import annotations
@@ -97,5 +99,8 @@ async def caption_stream(
         await websocket.close()
         return
 
-    store = CaptionStore(get_settings(), session_id)
-    await CaptionStreamSession(websocket, session_id, stt, store).run()
+    settings = get_settings()
+    store = CaptionStore(settings, session_id)
+    await CaptionStreamSession(
+        websocket, session_id, stt, store, jwt_secret=settings.jwt_secret
+    ).run()

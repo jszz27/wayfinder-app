@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from app.protocol import (
     AudioChunkMessage,
+    AuthMessage,
     CaptionMessage,
     EndStreamMessage,
     ErrorMessage,
@@ -26,10 +27,17 @@ from app.protocol import (
 )
 from app.store import CaptionStore
 from app.stt.base import SttStream
+from app.tokens import InvalidToken, read_access_token
 
 logger = logging.getLogger(__name__)
 
 _UNRECOGNISED = "Unrecognised message; expected audio_chunk or end_stream."
+_BAD_TOKEN = "Your sign-in has expired. Sign in again and restart captions."
+_LATE_AUTH = "auth must be the first message; this stream has already begun."
+
+# Policy-violation close code, for a stream that claimed an identity it
+# could not prove.
+WS_POLICY_VIOLATION = 1008
 
 
 class CaptionStreamSession:
@@ -39,10 +47,12 @@ class CaptionStreamSession:
         session_id: str,
         stt: SttStream,
         store: CaptionStore | None = None,
+        jwt_secret: str = "",
     ) -> None:
         self._websocket = websocket
         self._session_id = session_id
         self._stt = stt
+        self._jwt_secret = jwt_secret
         # Absent when captions are not being saved, which is the ordinary
         # case: only a signed-in listener's session has a row to write to.
         self._store = store
@@ -54,11 +64,44 @@ class CaptionStreamSession:
         self._failed = False
 
     async def run(self) -> None:
-        if self._store is not None:
-            await self._store.open()
+        # Started before the handshake, so a recogniser that is unavailable
+        # says so at once rather than after the listener has spoken. It
+        # cannot outrun the handshake: results come only from pushed audio,
+        # and no audio is pushed until the receive loop is running.
         forward = asyncio.create_task(self._forward_captions())
+
+        # Who is speaking has to be settled before anything can be written,
+        # so the first frame is read here rather than in the receive loop.
+        # A stream that sends no auth is anonymous, which is the ordinary
+        # case and needs no ceremony.
         try:
-            await self._receive_loop()
+            first = await self._receive_message()
+        except WebSocketDisconnect:
+            await self._abandon(forward)
+            return
+
+        user_id: str | None = None
+        if isinstance(first, AuthMessage):
+            try:
+                user_id = read_access_token(first.token, self._jwt_secret)
+            except InvalidToken as error:
+                # Loud, not silent. Someone who believes they are signed in
+                # would otherwise caption for ten minutes, find nothing
+                # saved, and never learn why.
+                logger.info(
+                    "caption session %s: rejecting token (%s)", self._session_id, error
+                )
+                await self._abandon(forward)
+                await self._send(ErrorMessage(message=_BAD_TOKEN))
+                with contextlib.suppress(RuntimeError):
+                    await self._websocket.close(code=WS_POLICY_VIOLATION)
+                return
+            first = None
+
+        if self._store is not None:
+            await self._store.open(user_id)
+        try:
+            await self._receive_loop(first)
         except WebSocketDisconnect:
             await self._abandon(forward)
             return
@@ -85,20 +128,31 @@ class CaptionStreamSession:
         with contextlib.suppress(RuntimeError):
             await self._websocket.close()
 
-    async def _receive_loop(self) -> None:
-        while True:
-            raw = await self._websocket.receive_text()
-            try:
-                message = client_message_adapter.validate_json(raw)
-            except ValidationError:
-                # A malformed frame is the client's problem, not a reason
-                # to tear down a working audio stream.
-                await self._send(ErrorMessage(message=_UNRECOGNISED))
-                continue
+    async def _receive_message(self):
+        """One frame, or None when it was not a message we know."""
+        raw = await self._websocket.receive_text()
+        try:
+            return client_message_adapter.validate_json(raw)
+        except ValidationError:
+            # A malformed frame is the client's problem, not a reason to
+            # tear down a working audio stream.
+            await self._send(ErrorMessage(message=_UNRECOGNISED))
+            return None
 
-            if isinstance(message, EndStreamMessage):
-                return
-            await self._handle_audio_chunk(message)
+    async def _receive_loop(self, pending=None) -> None:
+        """`pending` is the opening frame, when it was not an auth frame."""
+        message = pending
+        while True:
+            if message is not None:
+                if isinstance(message, EndStreamMessage):
+                    return
+                if isinstance(message, AuthMessage):
+                    # Identity is settled before the first chunk and never
+                    # changes hands mid-stream.
+                    await self._send(ErrorMessage(message=_LATE_AUTH))
+                else:
+                    await self._handle_audio_chunk(message)
+            message = await self._receive_message()
 
     async def _handle_audio_chunk(self, message: AudioChunkMessage) -> None:
         try:

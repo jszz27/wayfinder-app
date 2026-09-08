@@ -167,6 +167,70 @@ than configured", so a pinned session reports `null` throughout. The chip
 still names the pinned language, in muted styling — it is the user's own
 choice read back to them, not news.
 
+### An id is a name for a stream, not permission to write to a transcript
+
+Until this sprint closed, `backend-ws` took a bare `session_id` and asked
+only whether a row with that id existed. Anyone who learned an id could
+open a socket and have lines written into that person's saved text.
+Holding the id *was* the authorisation.
+
+That is a thin claim to make in the sprint whose goal is "Signup/login API
+/ JWT middleware", so it was fixed rather than carried forward.
+
+**Where the token goes.** A browser cannot set headers on a WebSocket, so
+the usual four options are a query parameter, the `Sec-WebSocket-Protocol`
+header, a first-message handshake, or a single-use ticket from a new REST
+endpoint. The query parameter is the common choice and is disqualified
+here on evidence rather than principle: this project's own uvicorn logs
+the full request line, which is how the `language` parameter was verified
+earlier in this sprint. A JWT there would be in every access log. The
+ticket would have meant a new §4 endpoint, and §4 is the part of the spec
+this project is most careful with. So: a first frame, and a §5 amendment,
+which §5 already had precedent for.
+
+```json
+{ "type": "auth", "token": "<access token>" }
+```
+
+**Optional, and first or not at all.** No frame is an anonymous stream,
+which captions normally and reaches no database — unchanged, and still the
+common case. Sending `auth` later is an error the stream survives, because
+a confused client is not a reason to cut off someone's captions, but
+identity cannot change hands part-way through a transcript.
+
+**A bad token fails loudly; a mismatched session fails quietly.** These
+are deliberately different. An unverifiable token means the client claimed
+an identity it does not have: one `error`, then close with 1008, because
+someone who believes they are signed in must not caption for ten minutes
+and only then find nothing was kept. A *valid* token for a session
+belonging to someone else simply does not save — answering any louder
+would confirm that the id exists, which is exactly what
+`GET /api/caption-sessions/{id}` returns 404 to avoid.
+
+**The store now asks a different question.** `select 1 from
+caption_sessions where id = :id` became `... where id = :id and user_id =
+:user_id`, and no verified user means no query at all. The privacy model
+did not change shape — it is still "no row, no transcript" — but the row
+now has to be *yours*.
+
+**What the two services share.** `JWT_SECRET`, and the payload shape.
+Nothing else: no models, no session, no call between them.
+`backend-ws/app/tokens.py` deliberately mirrors `backend-rest`'s constants
+rather than importing them, because they are separate packages in separate
+environments. That is the price of verifying a token without a network hop
+on every connection, and it is written down so nobody later assumes the
+duplication is an accident. A service started with no `JWT_SECRET` refuses
+every token rather than accepting them unchecked.
+
+**Reconnects re-authenticate.** Each connection is a new session on the
+server, so the frame goes out again every time the socket comes back — and
+the client fetches a *fresh* token each time rather than reusing the one it
+started with, since access tokens last fifteen minutes and a lecture does
+not. The client also drops audio between a socket opening and its auth
+frame going out: a chunk that overtook it would make the server read the
+whole stream as anonymous, and the transcript would stop being saved with
+nothing appearing to go wrong.
+
 ### Creating an account does not sign you in
 
 Signup answers with tokens and they are deliberately dropped. Someone who
@@ -242,7 +306,7 @@ so a mistake here cannot reach the development database.
 
 ## What is tested, and what is not
 
-**190 automated tests** — 108 REST, 82 WebSocket. The editing rules have
+**204 automated tests** — 108 REST, 96 WebSocket. The editing rules have
 their own file, `test_caption_sessions_editing.py`, whose point is the
 property above: renaming cannot discard an edit, editing cannot discard a
 name, and neither ever rewrites `caption_lines`.
@@ -275,7 +339,17 @@ The zero-line result was the privacy model working, not a bug — but it is
 a good illustration of how quietly "no row, no transcript" fails safe, and
 of why the two services must be pointed at the same database.
 
-Also still open, carried from Sprint 2: the WebSocket takes a bare
-`session_id` with no token, so anyone holding an id could stream into that
-session. Holding the id is the whole authorisation, which is thin, and
-Sprint 4 is where it should be fixed.
+The stream authentication was demonstrated by attack, not by assertion.
+A script opened a socket on a signed-in user's session id, with no token,
+and pushed enough audio for three confirmed lines:
+
+- **With the fix**: the attacker received its own captions — anonymous
+  captioning still works — and the victim's transcript stayed at 5 lines.
+- **With the old code restored**: the same script took the transcript from
+  5 lines to 8. The attacker's words were in someone else's saved text.
+
+The same pair of runs was done at the store level with four callers — the
+owner, a stranger, an anonymous listener and a bogus user id. Only the
+owner could write; the old code let all four through. And the access log
+was checked afterwards for the token: zero occurrences, which was the
+whole reason it travels in a frame.

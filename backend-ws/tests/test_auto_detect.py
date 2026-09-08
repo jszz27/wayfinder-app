@@ -31,6 +31,7 @@ def settings(**overrides) -> Settings:
         cors_origins=("http://localhost:5173",),
         # No database, so nothing this test does is written down.
         database_url="",
+        jwt_secret="",
     )
     return Settings(**{**base, **overrides})
 

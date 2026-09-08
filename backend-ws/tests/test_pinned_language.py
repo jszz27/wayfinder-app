@@ -27,6 +27,7 @@ def settings(**changes) -> Settings:
         google_detect_location="us-central1",
         cors_origins=(),
         database_url="",
+        jwt_secret="",
     )
     return dataclasses.replace(base, **changes)
 

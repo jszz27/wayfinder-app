@@ -1,7 +1,13 @@
 // The /api/auth and /api/users endpoints from Plan.md section 4.
 
 import { REST_BASE } from "../api";
-import { authHeaders, type StoredTokens } from "./session";
+import {
+  authHeaders,
+  currentAccessToken,
+  refreshToken,
+  saveTokens,
+  type StoredTokens,
+} from "./session";
 
 export interface Account {
   id: string;
@@ -80,6 +86,29 @@ export async function signOut(token: string): Promise<void> {
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ refresh_token: token }),
   }).catch(() => undefined);
+}
+
+/** An access token good for right now, or null while signed out.
+ *
+ * The caption socket cannot send an Authorization header and cannot be
+ * retried by an interceptor the way a request can, so it is worth one
+ * round trip to open it with a token that is certainly current. Access
+ * tokens last fifteen minutes; a tab left open longer than that would
+ * otherwise fail at the moment someone pressed Start.
+ */
+export async function freshAccessToken(): Promise<string | null> {
+  const stored = refreshToken();
+  if (!stored) return null;
+  try {
+    const tokens = await renew(stored);
+    saveTokens(tokens);
+    return tokens.access_token;
+  } catch {
+    // Expired, revoked, or simply offline. Send what we have and let the
+    // server judge it, rather than deciding here that this person is
+    // anonymous and quietly not saving their words.
+    return currentAccessToken();
+  }
 }
 
 export async function fetchAccount(): Promise<Account> {

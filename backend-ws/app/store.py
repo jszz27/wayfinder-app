@@ -12,6 +12,11 @@ for the row: backend-rest writes one only for a signed-in user, so finding
 none is what says the speaker is anonymous and their words are not to be
 kept. Nothing here can override that.
 
+The row must also belong to the listener who proved who they are. An id on
+its own is not permission to write to someone's transcript -- it is only a
+name for the stream, and names travel. Without a verified user there is
+nothing to match, so nothing is written at all.
+
 Persistence is never allowed to interrupt captioning. Every failure is
 logged and swallowed, and a session that fails once stops trying, because
 a live caption that keeps working matters more than a saved copy of it.
@@ -60,9 +65,22 @@ class CaptionStore:
         """True once a row has been found and writing has not since failed."""
         return self._saving
 
-    async def open(self) -> bool:
-        """Look for the session's row. False means nothing will be written."""
+    async def open(self, user_id: str | None) -> bool:
+        """Look for this listener's session row.
+
+        False means nothing will be written, which is the answer for an
+        anonymous listener, for a session that has no row, and for a
+        session that belongs to somebody else.
+        """
         if not self._settings.database_url:
+            return False
+        if user_id is None:
+            # Nobody proved who they are, so there is no row that could be
+            # theirs. This is the ordinary anonymous case.
+            return False
+        try:
+            owner = uuid.UUID(user_id)
+        except ValueError:
             return False
         try:
             # An anonymous session id is a UUID too, but any client can send
@@ -75,8 +93,11 @@ class CaptionStore:
             engine = get_engine(self._settings.database_url)
             async with engine.connect() as connection:
                 found = await connection.scalar(
-                    text("select 1 from caption_sessions where id = :id"),
-                    {"id": self._uuid},
+                    text(
+                        "select 1 from caption_sessions "
+                        "where id = :id and user_id = :user_id"
+                    ),
+                    {"id": self._uuid, "user_id": owner},
                 )
                 if found is not None:
                     self._base_seq = await connection.scalar(

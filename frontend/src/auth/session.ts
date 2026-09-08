@@ -63,3 +63,8 @@ export function refreshToken(): string | null {
 export function authHeaders(): Record<string, string> {
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 }
+
+/** The access token as it stands, for callers that cannot send a header. */
+export function currentAccessToken(): string | null {
+  return accessToken;
+}

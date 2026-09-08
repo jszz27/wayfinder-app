@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { captionSocketUrl, createCaptionSession } from "./api";
+import { freshAccessToken } from "./auth/api";
 import { describeMicError, startMicCapture } from "./audio/micCapture";
 import type { AudioCapture } from "./audio/pcmCapture";
 import {
@@ -134,16 +135,25 @@ export function useCaptionSession(
       const sessionId =
         (keepTranscript ? sessionIdRef.current : null) ?? (await openSession(source, persist));
       sessionIdRef.current = sessionId;
-      const socket = new CaptionSocket(captionSocketUrl(sessionId, pinnedLanguage), source, {
-        onCaption: (caption) => {
-          const seq = caption.seq + seqOffsetRef.current;
-          setLines((previous) => mergeLine(previous, seq, caption.text, caption.is_final));
-          if (caption.language) setLanguage(caption.language);
+      const socket = new CaptionSocket(
+        captionSocketUrl(sessionId, pinnedLanguage),
+        source,
+        {
+          onCaption: (caption) => {
+            const seq = caption.seq + seqOffsetRef.current;
+            setLines((previous) =>
+              mergeLine(previous, seq, caption.text, caption.is_final),
+            );
+            if (caption.language) setLanguage(caption.language);
+          },
+          onError: (message) => setNotice(message),
+          onStreamEnded: () => void finish(),
+          onConnectionChange: handleConnectionChange,
         },
-        onError: (message) => setNotice(message),
-        onStreamEnded: () => void finish(),
-        onConnectionChange: handleConnectionChange,
-      });
+        // Fetched again for every reconnect, so a recording that outlives
+        // its access token comes back signed in rather than anonymous.
+        freshAccessToken,
+      );
       socketRef.current = socket;
       await socket.open();
 

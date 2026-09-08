@@ -6,7 +6,10 @@ export type AudioSource = "mic" | "tab_audio";
 
 export type ClientMessage =
   | { type: "audio_chunk"; data: string; seq: number; source: AudioSource }
-  | { type: "end_stream" };
+  | { type: "end_stream" }
+  // Added in Sprint 3: who this stream belongs to. Optional, and only
+  // meaningful as the very first frame.
+  | { type: "auth"; token: string };
 
 export interface CaptionMessage {
   type: "caption";

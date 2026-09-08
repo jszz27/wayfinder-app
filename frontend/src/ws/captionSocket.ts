@@ -7,6 +7,14 @@ import {
 
 export type ConnectionState = "connecting" | "open" | "reconnecting" | "closed";
 
+/** Fetches the token to open a connection with, or null when signed out.
+ *
+ * A function rather than a value because it is called again for every
+ * reconnect: a long recording can outlive the token it started with, and
+ * a stale one would be refused just as the link came back.
+ */
+export type TokenSource = () => Promise<string | null>;
+
 export interface CaptionSocketHandlers {
   onCaption: (caption: CaptionMessage) => void;
   onError: (message: string) => void;
@@ -24,6 +32,8 @@ export class CaptionSocket {
   private reconnectTimer: number | null = null;
   private closedByUs = false;
   private everOpened = false;
+  /** True once this connection has said who it belongs to. */
+  private ready = false;
   /** Kept across reconnects so the server sees one continuous sequence. */
   private seq = 0;
 
@@ -31,6 +41,7 @@ export class CaptionSocket {
     private readonly url: string,
     private readonly source: AudioSource,
     private readonly handlers: CaptionSocketHandlers,
+    private readonly getToken: TokenSource = async () => null,
   ) {}
 
   /** Resolves once the first connection is established. */
@@ -46,9 +57,19 @@ export class CaptionSocket {
     const socket = new WebSocket(this.url);
     this.socket = socket;
 
-    socket.onopen = () => {
+    socket.onopen = async () => {
       this.attempt = 0;
       this.everOpened = true;
+
+      // Plan.md section 5: auth is the opening frame or nothing, so it
+      // goes out before the connection is reported open and before any
+      // audio can be queued behind it. Signed out there is no frame at
+      // all, which is what anonymous captioning looks like on the wire.
+      const token = await this.getToken().catch(() => null);
+      if (socket !== this.socket || socket.readyState !== WebSocket.OPEN) return;
+      if (token) this.send({ type: "auth", token });
+
+      this.ready = true;
       this.handlers.onConnectionChange("open");
       onFirstOpen?.();
     };
@@ -70,6 +91,7 @@ export class CaptionSocket {
     };
 
     socket.onclose = () => {
+      this.ready = false;
       if (this.closedByUs) {
         this.handlers.onConnectionChange("closed");
         return;
@@ -101,9 +123,15 @@ export class CaptionSocket {
     }, delay);
   }
 
-  /** Audio recorded while the link is down is dropped, not queued. */
+  /** Audio recorded while the link is down is dropped, not queued.
+   *
+   * That now includes the moment between a connection opening and its
+   * auth frame going out: a chunk that overtook it would make the server
+   * read the whole stream as anonymous, and the transcript would stop
+   * being saved without anything appearing to go wrong.
+   */
   sendAudioChunk(pcm: ArrayBuffer) {
-    if (this.socket?.readyState !== WebSocket.OPEN) return;
+    if (!this.ready || this.socket?.readyState !== WebSocket.OPEN) return;
     this.send({
       type: "audio_chunk",
       data: toBase64(pcm),

@@ -18,6 +18,9 @@ dependencies = [
     # The schema and its migrations belong to backend-rest.
     "sqlalchemy[asyncio]>=2.0",
     "asyncpg>=0.30",
+    # Verifies the access tokens backend-rest signs. The two services share
+    # JWT_SECRET and nothing else; see docs/sprint-3.md.
+    "pyjwt>=2.9",
 ]
 
 [project.optional-dependencies]

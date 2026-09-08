@@ -75,10 +75,15 @@ GitHub Actions → Cloud deployment (GCP Cloud Run) → deploys REST/WebSocket s
 
 Client → server:
 ```json
+{ "type": "auth", "token": "<access token>" }
 { "type": "audio_chunk", "data": "<base64>", "seq": 42, "source": "mic" }
 { "type": "end_stream" }
 ```
 `source` is either `"mic"` (microphone input) or `"tab_audio"` (audio from the shared browser tab), fixed once at the start of the session.
+
+`auth` says who the stream belongs to, and was added in Sprint 3. It is optional and must be the **first** frame: sending it later is an error, because identity cannot change hands part-way through a transcript. Sending none is an anonymous stream, which captions normally and reaches no database. A token that does not verify is refused out loud — one `error`, then close with 1008 — because someone who believes they are signed in must not caption for ten minutes and only then discover nothing was kept.
+
+The token travels in a message rather than the query string because query strings are written to every access log; a message body is not. It is re-sent on each reconnect, since each connection is authenticated on its own. `backend-ws` verifies it with the `JWT_SECRET` `backend-rest` signs with, and writes a transcript only where the session row's `user_id` matches — an id alone is a name for a stream, not permission to write to somebody's transcript. See `docs/sprint-3.md`.
 
 Server → client:
 ```json

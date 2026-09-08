@@ -38,6 +38,10 @@ class Settings:
     # Empty means captions are not saved at all, which is how this service
     # runs with no database in front of it.
     database_url: str
+    # Shared with backend-rest, which signs the tokens this service only
+    # ever verifies. Empty means no listener can be identified, so no
+    # transcript is written -- see app/tokens.py.
+    jwt_secret: str
 
 
 @lru_cache(maxsize=1)
@@ -55,4 +59,5 @@ def get_settings() -> Settings:
         google_detect_location=os.getenv("GOOGLE_DETECT_LOCATION", "us-central1"),
         cors_origins=origins,
         database_url=os.getenv("DATABASE_URL", ""),
+        jwt_secret=os.getenv("JWT_SECRET", ""),
     )

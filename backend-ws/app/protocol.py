@@ -1,8 +1,9 @@
 """The WebSocket message set from Plan.md section 5.
 
-This module is the single place the wire format is defined. The five
-message types below are the ones in the spec; `caption.language` is the
-one field added since, for automatic language detection.
+This module is the single place the wire format is defined. Five of the
+message types below are the ones in the spec; `caption.language` and the
+`auth` frame were added since -- for automatic language detection, and for
+proving who a stream belongs to. Both are recorded in Plan.md section 5.
 """
 
 from __future__ import annotations
@@ -28,8 +29,20 @@ class EndStreamMessage(BaseModel):
     type: Literal["end_stream"]
 
 
+class AuthMessage(BaseModel):
+    """Who this stream belongs to (Plan.md section 5, added in Sprint 3).
+
+    Optional, and only meaningful as the very first frame. The token
+    travels in a message rather than the query string because a query
+    string is written to every access log; a message body is not.
+    """
+
+    type: Literal["auth"]
+    token: str
+
+
 ClientMessage = Annotated[
-    Union[AudioChunkMessage, EndStreamMessage],
+    Union[AudioChunkMessage, EndStreamMessage, AuthMessage],
     Field(discriminator="type"),
 ]
 
