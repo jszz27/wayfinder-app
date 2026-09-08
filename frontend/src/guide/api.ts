@@ -2,6 +2,7 @@
 // backend-rest/app/routers/guide_sessions.py field for field.
 
 import { REST_BASE } from "../api";
+import { authHeaders } from "../auth/session";
 
 export type GuideRole = "user" | "assistant";
 
@@ -30,7 +31,10 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 export async function createGuideSession(): Promise<string> {
-  const response = await fetch(`${REST_BASE}/api/guide/sessions`, { method: "POST" });
+  const response = await fetch(`${REST_BASE}/api/guide/sessions`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
   if (!response.ok) {
     throw new Error(
       await readError(response, "Could not start the guide. Check the server is running."),
@@ -52,7 +56,7 @@ export async function sendGuideMessage(
     `${REST_BASE}/api/guide/sessions/${encodeURIComponent(sessionId)}/messages`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       // `screenshot` is sent only while screen sharing is on, per
       // Plan.md section 10 -- omitted entirely otherwise.
       body: JSON.stringify(screenshot === null ? { content } : { content, screenshot }),
@@ -67,7 +71,7 @@ export async function sendGuideMessage(
 export async function completeGuideSession(sessionId: string): Promise<GuideSession> {
   const response = await fetch(
     `${REST_BASE}/api/guide/sessions/${encodeURIComponent(sessionId)}/complete`,
-    { method: "PATCH" },
+    { method: "PATCH", headers: authHeaders() },
   );
   if (!response.ok) {
     throw new Error(await readError(response, "Could not finish the session."));
@@ -78,6 +82,7 @@ export async function completeGuideSession(sessionId: string): Promise<GuideSess
 export async function getGuideSession(sessionId: string): Promise<GuideSession> {
   const response = await fetch(
     `${REST_BASE}/api/guide/sessions/${encodeURIComponent(sessionId)}`,
+    { headers: authHeaders() },
   );
   if (!response.ok) {
     throw new Error(await readError(response, "Could not load the conversation."));

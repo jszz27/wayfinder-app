@@ -92,6 +92,18 @@ Windows but not on macOS, which cannot capture a native app's sound at
 all. And the choice cannot be remembered, so it has to be made every
 session.
 
+## Signing in
+
+The widget has no login screen. Plan.md §8 keeps it to one screen with no
+routing, and an account here is optional, so signing in is a panel that
+opens in place beneath the settings rather than a gate in front of
+everything.
+
+The line above it says which way round things are -- "Not signed in, so
+nothing is being saved", or "Signed in as … Captions are being saved" —
+because whether speech is being kept should not be something a user has to
+work out.
+
 ## Settings that follow you
 
 Text size and caption language are stored on the account, so they carry to

@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { useAuth } from "./auth/useAuth";
+import { AccountPanel } from "./components/AccountPanel";
 import { downloadTranscript } from "./captions/transcript";
 import { CaptionPanel } from "./components/CaptionPanel";
 import { GuidePanel } from "./components/GuidePanel";
@@ -63,6 +65,19 @@ export default function App() {
   const { status, lines, notice, language, reset, start, stop, dismissNotice } =
     useCaptionSession(source);
   const guide = useGuideSession();
+  const auth = useAuth();
+
+  // A saved text size follows the account to whatever device it is signed
+  // in on, which for someone who needs larger text is most of the reason
+  // to have an account at all.
+  useEffect(() => {
+    if (auth.account) setFontSize(auth.account.font_size);
+  }, [auth.account]);
+
+  const changeFontSize = (size: number) => {
+    setFontSize(size);
+    void auth.rememberFontSize(size);
+  };
   const running = status !== "idle";
   const guideSending = guide.status === "sending";
   const guideComplete = guide.status === "complete";
@@ -155,7 +170,17 @@ export default function App() {
             Save as text file
           </button>
 
-          <SettingsBar fontSize={fontSize} onFontSizeChange={setFontSize} />
+          <SettingsBar fontSize={fontSize} onFontSizeChange={changeFontSize} />
+          <AccountPanel
+            status={auth.status}
+            account={auth.account}
+            notice={auth.notice}
+            busy={auth.busy}
+            onSignIn={auth.signIn}
+            onSignUp={auth.signUp}
+            onSignOut={() => void auth.signOut()}
+            onDismissNotice={auth.dismissNotice}
+          />
         </>
       ) : (
         <>
@@ -211,7 +236,7 @@ export default function App() {
             )
           )}
 
-          <SettingsBar fontSize={fontSize} onFontSizeChange={setFontSize} />
+          <SettingsBar fontSize={fontSize} onFontSizeChange={changeFontSize} />
         </>
       )}
     </main>

@@ -1,3 +1,4 @@
+import { authHeaders } from "./auth/session";
 import type { AudioSource } from "./ws/protocol";
 
 // Empty base means same-origin, which the Vite dev proxy forwards to the
@@ -9,7 +10,7 @@ export async function createCaptionSession(
 ): Promise<string> {
   const response = await fetch(`${REST_BASE}/api/caption-sessions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ audio_source: audioSource }),
   });
   if (!response.ok) {

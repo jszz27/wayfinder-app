@@ -313,6 +313,88 @@ body {
   opacity: 0.45;
 }
 
+/* --- account -------------------------------------------------------- */
+
+/* Below the settings rather than above the tabs: an account here is for
+   keeping your text size and your transcripts, not for getting in. */
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.account-status {
+  font-size: 12px;
+  color: var(--text-faded);
+}
+
+.account-link {
+  flex: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.account-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.account-field input {
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.account-notice {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.account-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-submit {
+  flex: none;
+  padding: 10px 18px;
+  font-size: 15px;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
