@@ -60,7 +60,7 @@ export default function App() {
   const [source, setSource] = useState<AudioSource>("mic");
   const [fontSize, setFontSize] = useState<number>(FONT_SIZES[1]);
 
-  const { status, lines, notice, language, start, stop, dismissNotice } =
+  const { status, lines, notice, language, reset, start, stop, dismissNotice } =
     useCaptionSession(source);
   const guide = useGuideSession();
   const running = status !== "idle";
@@ -113,13 +113,16 @@ export default function App() {
             </button>
           ) : lines.length > 0 ? (
             /* Stopping with a transcript on screen is a fork, not an end:
-               carry on after it, or throw it away and begin again. Both
-               sit where Stop was, so the choice is where the eye already is. */
+               carry on after it, or clear it and be back at the beginning.
+               Both sit where Stop was, so the choice is where the eye
+               already is. Reset only clears -- it does not start listening,
+               because discarding a transcript and deciding to record again
+               are two decisions, not one. */
             <div className="button-row">
               <button
                 type="button"
                 className="secondary-button"
-                onClick={() => void start(false)}
+                onClick={reset}
               >
                 Reset
               </button>

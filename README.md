@@ -67,8 +67,9 @@ Issue checklist and evidence: [`docs/sprint-2.md`](./docs/sprint-2.md).
 ## Stopping, and carrying on
 
 Stopping with a transcript on screen offers two ways forward rather than
-one. "Continue" keeps what is there and records after it; "Reset" discards
-it and starts again. The transcript belongs to the widget, not to a
+one. "Continue" keeps what is there and records after it; "Reset" clears
+it and leaves the widget idle, back at a plain "Start" -- discarding a
+transcript and deciding to record again are two decisions, not one. The transcript belongs to the widget, not to a
 recognition session, so a session can be continued with a different audio
 source -- stop while captioning a video, switch to the microphone, and
 continue into the same transcript.

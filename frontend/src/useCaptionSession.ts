@@ -91,6 +91,15 @@ export function useCaptionSession(source: AudioSource) {
     endTimerRef.current = window.setTimeout(() => void finish(), STREAM_END_TIMEOUT_MS);
   }, [finish]);
 
+  /** Clears the transcript without recording, back to a fresh start. */
+  const reset = useCallback(() => {
+    if (statusRef.current !== "idle") return;
+    seqOffsetRef.current = 0;
+    setLines([]);
+    setLanguage(null);
+    setNotice(null);
+  }, []);
+
   /** `keepTranscript` continues after what is already on screen. */
   const start = useCallback(async (keepTranscript = false) => {
     if (statusRef.current !== "idle") return;
@@ -152,6 +161,7 @@ export function useCaptionSession(source: AudioSource) {
     lines,
     notice,
     language,
+    reset,
     start,
     stop,
     dismissNotice: useCallback(() => setNotice(null), []),
