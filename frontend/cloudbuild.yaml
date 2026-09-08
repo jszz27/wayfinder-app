@@ -1,0 +1,15 @@
+# The widget's backend URLs are compile-time, not runtime: Vite replaces
+# import.meta.env when it bundles. So they arrive as build arguments, and
+# the resulting image belongs to one environment.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg=VITE_REST_BASE_URL=${_REST_URL}
+      - --build-arg=VITE_WS_BASE_URL=${_WS_URL}
+      - --tag=${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
+options:
+  logging: CLOUD_LOGGING_ONLY

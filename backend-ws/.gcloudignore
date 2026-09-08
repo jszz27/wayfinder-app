@@ -1,0 +1,13 @@
+# gcloud builds submit reads this file, not .dockerignore, so without it
+# the whole virtualenv or node_modules is uploaded before the build even
+# starts. Kept alongside .dockerignore rather than merged into it: they
+# are read by different tools at different moments.
+.git/
+.venv/
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+*.egg-info/

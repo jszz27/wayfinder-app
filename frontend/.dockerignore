@@ -1,0 +1,5 @@
+# node_modules is reinstalled inside the image from the lockfile, and dist
+# is rebuilt there; shipping either would only risk a stale one winning.
+node_modules/
+dist/
+.vite/

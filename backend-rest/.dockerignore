@@ -1,0 +1,10 @@
+# The build context is uploaded before anything is built, so keeping a
+# virtualenv and a test suite out of it is the difference between a few
+# hundred kilobytes and a few hundred megabytes.
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+build/
+*.egg-info/

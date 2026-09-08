@@ -1,0 +1,114 @@
+# Plan.md section 12, Sprint 4: build, migrate, deploy.
+#
+# Authentication is Workload Identity Federation, not a service account
+# key -- this project's organisation blocks key creation outright
+# (iam.disableServiceAccountKeyCreation), which turned out to be the right
+# constraint anyway: there is no long-lived credential in this repository
+# or in GitHub's secret store, only a short-lived token minted per run and
+# only for this one repository.
+
+name: Deploy
+
+on:
+  # Never on a push. Deploying is a decision, and it is taken here.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Image tag to build and deploy
+        required: true
+        default: latest
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # The OIDC token that is exchanged for a Google credential.
+  id-token: write
+
+env:
+  REGION: us-central1
+  REPO: us-central1-docker.pkg.dev/project-9cf694a4-6c55-4005-aa1/wayfinder
+
+jobs:
+  deploy:
+    name: Build, migrate, deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/139220777182/locations/global/workloadIdentityPools/github/providers/github
+          service_account: wayfinder-deploy@project-9cf694a4-6c55-4005-aa1.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Built before anything is deployed, so a broken image never reaches
+      # a running service. Cloud Build rather than docker build, so the
+      # runner needs no registry credentials of its own.
+      - name: Build the REST image
+        working-directory: backend-rest
+        run: gcloud builds submit --tag "$REPO/backend-rest:${{ inputs.tag }}" .
+
+      - name: Build the WebSocket image
+        working-directory: backend-ws
+        run: gcloud builds submit --tag "$REPO/backend-ws:${{ inputs.tag }}" .
+
+      # The schema moves first. A new column has to exist before the
+      # revision that selects it takes traffic; the other order gives you
+      # a successful deploy and a stream of 500s.
+      - name: Migrate
+        run: |
+          gcloud run jobs update wayfinder-migrate \
+            --image "$REPO/backend-rest:${{ inputs.tag }}" \
+            --region "$REGION"
+          gcloud run jobs execute wayfinder-migrate --region "$REGION" --wait
+
+      - name: Deploy the REST API
+        # --max-instances=1 is load-bearing, not a cost control: a guide
+        # conversation held while auto-save is off lives in one process,
+        # and a second instance would not find it. See docs/sprint-4.md.
+        run: |
+          gcloud run deploy backend-rest \
+            --image "$REPO/backend-rest:${{ inputs.tag }}" \
+            --region "$REGION" --max-instances=1
+
+      - name: Deploy the WebSocket server
+        # No such cap here: its only state is the database.
+        run: |
+          gcloud run deploy backend-ws \
+            --image "$REPO/backend-ws:${{ inputs.tag }}" \
+            --region "$REGION"
+
+      # The widget last, because its two backend URLs are compiled into
+      # the bundle and it should be built against what is actually running.
+      - name: Build and deploy the widget
+        working-directory: frontend
+        run: |
+          REST_URL=$(gcloud run services describe backend-rest --region "$REGION" --format='value(status.url)')
+          WS_URL=$(gcloud run services describe backend-ws --region "$REGION" --format='value(status.url)')
+          gcloud builds submit --config=cloudbuild.yaml \
+            --substitutions="_IMAGE=$REPO/frontend:${{ inputs.tag }},_REST_URL=$REST_URL,_WS_URL=${WS_URL/https:/wss:}" .
+          gcloud run deploy frontend \
+            --image "$REPO/frontend:${{ inputs.tag }}" \
+            --region "$REGION"
+
+      # Deploying something that does not answer is worse than not
+      # deploying at all, so this fails the run rather than leaving it
+      # green with a dead service behind it.
+      - name: Check all three answer
+        run: |
+          for SERVICE in backend-rest backend-ws frontend; do
+            URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
+            if [ "$SERVICE" = "frontend" ]; then
+              CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL/")
+            else
+              CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL/health")
+            fi
+            echo "$SERVICE -> $CODE"
+            [ "$CODE" = "200" ] || { echo "::error::$SERVICE did not answer with 200"; exit 1; }
+          done
