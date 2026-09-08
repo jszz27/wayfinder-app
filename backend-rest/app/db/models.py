@@ -170,6 +170,10 @@ class GuideSession(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Null until renamed, like a caption session's. The list shows the
+    # first question asked instead, which is what makes a conversation
+    # recognisable when nobody has named it.
+    title: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="guide_sessions")
     messages: Mapped[list["GuideMessage"]] = relationship(

@@ -62,9 +62,12 @@ GitHub Actions → Cloud deployment (GCP Cloud Run) → deploys REST/WebSocket s
 - `POST /api/guide/sessions/{session_id}/messages` — Send a situation description → get the AI's next-step response. Body includes the text question plus an optional `screenshot: "<base64 image>"` (included only while screen sharing is on)
 - `GET /api/guide/sessions/{session_id}` — Get conversation history
 - `GET /api/guide/sessions` — List my conversations *(added in Sprint 3)*
+- `POST /api/guide/sessions/{session_id}/save` — Keep a conversation that was not being kept *(added in Sprint 3)*
+- `PATCH /api/guide/sessions/{session_id}` — Rename a conversation *(added in Sprint 3)*
+- `DELETE /api/guide/sessions/{session_id}` — Delete a conversation *(added in Sprint 3)*
 - `PATCH /api/guide/sessions/{session_id}/complete` — Mark the session complete
 
-> **`GET /api/guide/sessions` was added in Sprint 3.** Caption sessions had a list from the start and guide sessions did not, which meant a signed-in user's conversations were stored and unreachable: reading one needs an id, and nothing handed out ids once the tab had closed. Data kept and never shown is worse than data not kept. See `docs/sprint-3.md`.
+> **Four guide endpoints were added in Sprint 3**, bringing them level with caption sessions, which had a list, a save-by-hand, a rename and a delete. `GET` came first: without it a signed-in user's conversations were stored and unreachable, since reading one needs an id and nothing handed out ids once the tab had closed. The other three followed from auto-save applying to guide mode as well — with it off a conversation has to be keepable by hand, and anything an account keeps has to be nameable and removable. `POST .../save` takes no body: it writes the copy the server is already holding, so the client cannot put words in the assistant's mouth by asking for them to be saved. See `docs/sprint-3.md`.
 
 **User settings**
 - `GET /api/users/me` — Get profile/settings
@@ -112,7 +115,7 @@ caption_lines
   id (PK), session_id (FK), seq, text, created_at
 
 guide_sessions
-  id (PK), user_id (FK), started_at, completed_at
+  id (PK), user_id (FK), started_at, completed_at, title
 
 guide_messages
   id (PK), guide_session_id (FK), role (user/assistant), content, created_at

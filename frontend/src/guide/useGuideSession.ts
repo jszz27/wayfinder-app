@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   completeGuideSession,
   createGuideSession,
+  saveGuideSession,
   sendGuideMessage,
   type GuideMessage,
 } from "./api";
@@ -14,11 +15,18 @@ import {
 
 export type GuideStatus = "idle" | "sending" | "complete";
 
-export function useGuideSession() {
+/** `keep` is the account's auto-save setting: whether this conversation
+ * belongs to the account as it happens, or only if the person asks.
+ */
+export function useGuideSession(keep: boolean) {
   const [messages, setMessages] = useState<GuideMessage[]>([]);
   const [status, setStatus] = useState<GuideStatus>("idle");
   const [notice, setNotice] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [keeping, setKeeping] = useState(false);
+  // How many turns have been written, so the button can tell "kept" from
+  // "kept, and then we carried on".
+  const [keptTurns, setKeptTurns] = useState<number | null>(null);
 
   const sessionRef = useRef<string | null>(null);
   const shareRef = useRef<ScreenShare | null>(null);
@@ -65,11 +73,16 @@ export function useGuideSession() {
 
     try {
       if (sessionRef.current === null) {
-        sessionRef.current = await createGuideSession();
+        sessionRef.current = await createGuideSession(keep);
       }
       // Captured at the moment of sending, never before (Plan.md section 10).
       const screenshot = shareRef.current?.capture() ?? null;
-      const reply = await sendGuideMessage(sessionRef.current, content, screenshot);
+      const reply = await sendGuideMessage(
+        sessionRef.current,
+        content,
+        screenshot,
+        keep,
+      );
       setMessages((previous) => [...previous, reply]);
       setStatus("idle");
     } catch (error) {
@@ -77,7 +90,24 @@ export function useGuideSession() {
       setNotice(error instanceof Error ? error.message : "The guide could not answer.");
       setStatus("idle");
     }
-  }, [status]);
+  }, [keep, status]);
+
+  /** Keeps this conversation, or adds the turns since it was last kept. */
+  const save = useCallback(async () => {
+    if (sessionRef.current === null) return;
+    setKeeping(true);
+    setNotice(null);
+    try {
+      await saveGuideSession(sessionRef.current);
+      setKeptTurns(messages.length);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "Could not save this conversation.",
+      );
+    } finally {
+      setKeeping(false);
+    }
+  }, [messages.length]);
 
   const finish = useCallback(async () => {
     if (sessionRef.current === null || status === "sending") return;
@@ -95,7 +125,9 @@ export function useGuideSession() {
     setMessages([]);
     setStatus("idle");
     setNotice(null);
-  }, []);
+    setKeptTurns(null);
+    stopSharing();
+  }, [stopSharing]);
 
   return {
     messages,
@@ -103,7 +135,11 @@ export function useGuideSession() {
     notice,
     sharing,
     hasSession: sessionRef.current !== null || messages.length > 0,
+    keeping,
+    kept: keptTurns !== null && keptTurns === messages.length,
+    keptBefore: keptTurns !== null,
     send,
+    save,
     finish,
     reset,
     startSharing,

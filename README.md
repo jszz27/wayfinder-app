@@ -142,6 +142,14 @@ about the recording; auto-save is a question about where the words go, and
 the two are unrelated. Saving by hand twice updates the one entry rather
 than leaving a second with the first one's text inside it.
 
+The same setting governs guide mode. Off, a conversation is held the way
+an anonymous one is -- in the server's own memory, reaching no table --
+until "Save this conversation" is pressed, and what gets written is the
+server's copy rather than one the browser sends back. There is no Continue
+button there because a conversation never stopped: you continue it by
+asking the next question. Conversations can be renamed and deleted from
+`/conversations`, as saved text can from `/saved`.
+
 ## Accounts and saved transcripts
 
 Captioning and guide mode work with no account, and in that case nothing
@@ -242,7 +250,7 @@ cd backend-rest; pytest
 cd frontend;     npm run build    # type-check + bundle
 ```
 
-215 tests at the close of Sprint 3: 119 in `backend-rest`, 96 in
+232 tests at the close of Sprint 3: 136 in `backend-rest`, 96 in
 `backend-ws`.
 
 The REST tests need PostgreSQL. They run against `wayfinder_test`, never
@@ -261,7 +269,8 @@ Issue checklist and verification evidence:
 
 **Delivered.** All of `Plan.md` §4, all six tables of §6, and the pages
 that let someone read back, correct, name, download and delete what was
-said. 215 tests pass (119 `backend-rest`, 96 `backend-ws`).
+said -- captions and conversations alike. 232 tests pass (136
+`backend-rest`, 96 `backend-ws`).
 
 **What worked.** Trying to break a thing before trusting it, every time.
 Four changes this sprint were verified by *first* demonstrating the
@@ -289,10 +298,11 @@ spec spent the sprint slightly behind the code. Reading §4 and §8 against
 the sprint's actual scope on day one would have surfaced at least the
 routing question before any of it was built.
 
-**Carried forward.** `guide_sessions` can be read but not deleted, which
-is an asymmetry with caption sessions and a `DELETE` endpoint away from
-being fixed. The 106 untested language pairs from Sprint 2 are still
-untested. Retry and fallback for STT and LLM failures remain Sprint 5.
+**Carried forward.** The 106 untested language pairs from Sprint 2 are
+still untested. Retry and fallback for STT and LLM failures remain
+Sprint 5. A conversation held for auto-save off lives in one process, so
+it does not survive a restart and would not be found by a second instance
+-- which Sprint 4's deployment has to account for.
 
 ### Sprint 2 (weeks 3–4) — Guide mode
 Issue checklist and verification evidence:

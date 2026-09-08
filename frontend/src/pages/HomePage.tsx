@@ -90,7 +90,7 @@ export function HomePage() {
     stop,
     dismissNotice,
   } = useCaptionSession(source, persist, language);
-  const guide = useGuideSession();
+  const guide = useGuideSession(persist);
 
   // A saved text size follows the account to whatever device it is signed
   // in on, which for someone who needs larger text is most of the reason
@@ -143,6 +143,46 @@ export function HomePage() {
   const keptAlready = keptAs !== null && keptText === buildTranscript(lines);
   const guideSending = guide.status === "sending";
   const guideComplete = guide.status === "complete";
+
+  // Auto-save decides whether anything either mode produces is kept, so
+  // it belongs with the settings under both rather than to captions.
+  const autoSaveRow = signedIn ? (
+    <div className="settings-bar">
+      <span className="settings-label" id="auto-save-label">
+        Auto-save
+      </span>
+      <div
+        className="settings-options"
+        role="radiogroup"
+        aria-labelledby="auto-save-label"
+      >
+        {[true, false].map((on) => (
+          <button
+            key={String(on)}
+            type="button"
+            role="radio"
+            className="settings-option"
+            aria-checked={autoSave === on}
+            /* Changing this partway would move where what is already on
+               screen was going, so it waits until nothing is running. */
+            disabled={running || guide.hasSession}
+            onClick={() => void auth.rememberAutoSave(on)}
+          >
+            {on ? "On" : "Off"}
+          </button>
+        ))}
+      </div>
+      <span className="account-status">
+        {autoSave
+          ? "Kept in your account as you go."
+          : "Nothing is kept until you save it."}
+      </span>
+    </div>
+  ) : (
+    <p className="account-status">
+      Not signed in, so nothing is being saved to an account.
+    </p>
+  );
 
   return mode === "caption" ? (
     <>
@@ -288,44 +328,7 @@ export function HomePage() {
         onLanguageChange={changeLanguage}
         languageLocked={running}
       />
-
-      {signedIn ? (
-        <div className="settings-bar">
-          <span className="settings-label" id="auto-save-label">
-            Auto-save
-          </span>
-          <div
-            className="settings-options"
-            role="radiogroup"
-            aria-labelledby="auto-save-label"
-          >
-            {[true, false].map((on) => (
-              <button
-                key={String(on)}
-                type="button"
-                role="radio"
-                className="settings-option"
-                aria-checked={autoSave === on}
-                /* Changing this mid-session would move where the words
-                   already on screen were going, so it waits. */
-                disabled={running}
-                onClick={() => void auth.rememberAutoSave(on)}
-              >
-                {on ? "On" : "Off"}
-              </button>
-            ))}
-          </div>
-          <span className="account-status">
-            {autoSave
-              ? "Stopping keeps this text in your account."
-              : "Nothing is kept until you save it."}
-          </span>
-        </div>
-      ) : (
-        <p className="account-status">
-          Not signed in, so nothing is being saved to an account.
-        </p>
-      )}
+      {autoSaveRow}
     </>
   ) : (
     <>
@@ -362,21 +365,53 @@ export function HomePage() {
         </div>
       )}
 
+      {/* Carrying on in guide mode is asking the next question, so there
+          is no Continue button to press -- the composer above is it. What
+          the buttons decide is the same as in caption mode: whether to
+          clear this and start again, and, when nothing is being kept
+          automatically, whether to keep it. */}
       {guideComplete ? (
         <button type="button" className="primary-button" onClick={guide.reset}>
           Start a new conversation
         </button>
       ) : (
         guide.hasSession && (
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => void guide.finish()}
-            disabled={guideSending}
-          >
-            Finish this conversation
-          </button>
+          <div className="button-row">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={guide.reset}
+              disabled={guideSending}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => void guide.finish()}
+              disabled={guideSending}
+            >
+              Finish this conversation
+            </button>
+          </div>
         )
+      )}
+
+      {signedIn && !autoSave && guide.messages.length > 0 && (
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => void guide.save()}
+          disabled={guide.keeping || guide.kept || guideSending}
+        >
+          {guide.kept
+            ? "Saved to your account"
+            : guide.keeping
+              ? "Saving…"
+              : guide.keptBefore
+                ? "Save the rest to my account"
+                : "Save this conversation"}
+        </button>
       )}
 
       <SettingsBar
@@ -386,6 +421,7 @@ export function HomePage() {
         onLanguageChange={changeLanguage}
         languageLocked={false}
       />
+      {autoSaveRow}
     </>
   );
 }

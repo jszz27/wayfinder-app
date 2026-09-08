@@ -245,6 +245,52 @@ frame going out: a chunk that overtook it would make the server read the
 whole stream as anonymous, and the transcript would stop being saved with
 nothing appearing to go wrong.
 
+### Auto-save governs guide mode too, and reuses the anonymous path
+
+The same setting, not a second one: "keep what I do here" is one decision,
+and two switches would be two things to get wrong.
+
+Guide mode cannot do what captions do with auto-save off, though. A
+caption transcript can live entirely in the browser because the server
+needs no memory of it; a conversation cannot, because the model needs the
+earlier turns to answer a follow-up. It has to be held *somewhere*.
+
+It already was. An anonymous conversation is held in this process and
+forgotten, and auto-save off is exactly that arrangement for someone who
+happens to have an account — so the client sends no token when starting
+one, and the server takes the path it already had. No new field, no flag,
+and the "does this reach a table" question still has one answer.
+
+`POST /api/guide/sessions/{id}/save` then writes it, and takes **no body**.
+The server has its own copy, so it saves what it actually said rather than
+what a browser hands back — the same principle as `caption_lines` being
+what the recogniser produced. A client cannot put words in the assistant's
+mouth by asking for them to be saved.
+
+Saving twice adds the turns since rather than a second copy, which is the
+same promise Continue makes for captions. Two edges are refused rather
+than fudged: a conversation this process no longer holds cannot be saved
+(better than writing an empty one and calling it kept), and one that was
+saved and then deleted cannot be saved again (that would resurrect
+something the person threw away).
+
+### Guide mode has no Continue button, because it never stopped
+
+The request asked for save, continue and reset in guide mode, matching
+captions. Two of those built directly. Continue did not, and the reason is
+worth writing down rather than quietly dropping.
+
+Captioning has a Stop, so Continue is a real state change: pick the
+microphone back up. A conversation has no Stop — you continue it by asking
+the next question, and the box to do that is already on screen. The only
+place a Continue *button* could go is after "Finish this conversation",
+and there it would mean one of two bad things: reopening a session the
+server has deliberately closed, or starting a new one that the model has
+no history for, which is the whole value of guide mode.
+
+So guide mode's buttons are Reset, Finish, and — with auto-save off —
+Save. Continuing is asking.
+
 ### Creating an account does not sign you in
 
 Signup answers with tokens and they are deliberately dropped. Someone who
@@ -340,6 +386,13 @@ in both modes.
 - [x] Named by the first question asked, counted in questions rather than messages
 - [x] Anonymous conversations never appear, because they belong to nobody
 - [x] `/conversations` and `/conversations/:id` behind the same header button as saved text
+- [x] Auto-save governs guide mode too, from the one setting
+- [x] Off, a conversation reaches no table until `POST .../save` is asked for
+- [x] What is saved is the server's own copy, never one sent from the browser
+- [x] Saving again after carrying on adds the turns since, not a second copy
+- [x] A conversation this process no longer holds, or one already deleted, is refused
+- [x] `PATCH` renames and `DELETE` removes, as for caption sessions (§4, amended)
+- [x] `guide_sessions.title` (§6, amended)
 
 ### Issue 17 — Pages `frontend`
 - [x] `react-router` data router; §8 amended and the reasoning recorded
@@ -371,6 +424,9 @@ in both modes.
 | Downloaded file | Byte-inspected: `efbbbf` BOM, title-derived filename, content including the saved edit |
 | Signup does not sign in | Mismatched confirmation refused before the request; matching one landed on `/signin` with the header still signed out |
 | Conversations reachable | Seeded two turns, listed at `/conversations` named by the opening question, opened and both turns rendered |
+| Guide auto-save off keeps nothing | Asked a question with the setting off: `GET /api/guide/sessions` returned zero before Save was pressed |
+| Guide save, carry on, save again | One conversation, 2 exchanges, 4 messages in `user, assistant, user, assistant` order — no duplicated beginning |
+| Rename and delete a conversation | Renamed in place to "Sending money to Mina", then deleted behind the two-step confirm; the list went back to empty |
 
 ---
 
@@ -416,7 +472,7 @@ so a mistake here cannot reach the development database.
 
 ## What is tested, and what is not
 
-**215 automated tests** — 119 REST, 96 WebSocket. Two files exist for a
+**232 automated tests** — 136 REST, 96 WebSocket. Two files exist for a
 property rather than an endpoint: `test_caption_sessions_editing.py`, for
 renaming and editing never discarding each other or rewriting
 `caption_lines`; and `test_stream_auth.py`, for a stream having to say
@@ -444,8 +500,7 @@ signed-in session that finds no row deserves a log line at warning level.
 
 ## Out of scope this sprint
 
-`DELETE /api/guide/sessions/{id}` — conversations can be read but not
-removed, which is an asymmetry with caption sessions · The 106 untested
+The 106 untested
 language pairs carried from Sprint 2 · TTS (§3 lists it, §12 places it in
 no sprint) · GitHub Actions and Cloud Run (Sprint 4) · STT and LLM retry
 and fallback (Sprint 5) · Moving tokens from `localStorage` to httpOnly
