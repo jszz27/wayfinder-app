@@ -293,6 +293,11 @@ body {
   cursor: pointer;
 }
 
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

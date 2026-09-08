@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { downloadTranscript } from "./captions/transcript";
 import { CaptionPanel } from "./components/CaptionPanel";
 import { GuidePanel } from "./components/GuidePanel";
 import { ModeTabs, type Mode } from "./components/ModeTabs";
@@ -96,6 +97,17 @@ export default function App() {
             disabled={status === "starting" || status === "stopping"}
           >
             {running ? "Stop" : "Start"}
+          </button>
+
+          {/* Keeping what was said is the other half of being able to
+              follow it, so this stays available while listening too. */}
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => downloadTranscript(lines)}
+            disabled={lines.length === 0}
+          >
+            Save as text file
           </button>
 
           <SettingsBar fontSize={fontSize} onFontSizeChange={setFontSize} />

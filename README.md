@@ -64,6 +64,13 @@ Vertex AI, authenticating with the same credentials as speech-to-text.
 
 Issue checklist and evidence: [`docs/sprint-2.md`](./docs/sprint-2.md).
 
+## Saving a transcript
+
+"Save as text file" in caption mode downloads everything captioned so far
+as a plain `.txt`, one line per caption, oldest first. The file carries a
+UTF-8 byte order mark, because these transcripts are often Korean and some
+Windows editors read a BOM-less file as the system codepage.
+
 ## Punctuation
 
 Captions are punctuated as they are spoken, on interim results as well as
