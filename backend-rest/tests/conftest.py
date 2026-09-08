@@ -28,7 +28,6 @@ assert os.environ.get("DATABASE_URL", "").endswith("/wayfinder_test"), (
 
 from app.config import get_settings  # noqa: E402
 from app.main import app  # noqa: E402
-from app.routers.caption_sessions import reset_sessions  # noqa: E402
 from app.routers.guide_sessions import (  # noqa: E402
     reset_sessions as reset_guide_sessions,
 )
@@ -44,7 +43,8 @@ def _mock_guide_model(monkeypatch):
 
 @pytest.fixture
 def client() -> TestClient:
-    reset_sessions()
+    # Caption sessions live in PostgreSQL now; only guide mode still has an
+    # in-memory store to clear between tests.
     reset_guide_sessions()
     return TestClient(app)
 
