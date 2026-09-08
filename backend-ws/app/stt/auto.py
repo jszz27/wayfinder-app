@@ -7,12 +7,26 @@ so captions stay word-by-word live after the first moment.
 The pinning is not permanent. Google's streaming models transcribe one
 language per stream: given several language codes they pick one and drop
 the rest, so a speaker who switches language mid-session cannot be
-followed by a single stream. What they can be followed by is the
-recogniser's own confidence, which collapses when the audio stops
-matching the language it was told to expect -- measured at 0.93 to 0.99
-on matching speech against 0.03 to 0.13 on mismatched. A final that far
-down is the cue to work the language out again and, if it really has
-changed, open a fresh stream and replay the audio that was misheard.
+followed by a single stream. A new stream has to be opened instead, which
+means noticing that the old one has gone wrong.
+
+There is no single symptom. Measured across four language pairs, a stream
+fed the wrong language does one of three things, and each needs its own
+cue:
+
+  confidence collapses  English into a Korean-pinned stream returns finals
+                        at 0.03 to 0.13, against 0.93 to 0.99 when matched
+  results stop          Korean into English, and Japanese into Spanish,
+                        simply go quiet -- no final ever arrives, so
+                        confidence is never offered
+  nothing settles       French into a German-pinned stream keeps producing
+                        plausible interims and never finalises, so results
+                        are flowing and nothing looks wrong
+
+Any of the three prompts a fresh detection, and only a genuinely different
+answer opens a new stream, with the recent audio replayed so the misheard
+words are recovered. Silence from a quiet room is excluded by measuring
+the audio's energy first: a pause in the conversation is not a stall.
 """
 
 from __future__ import annotations
@@ -22,6 +36,7 @@ import contextlib
 import dataclasses
 import logging
 import time
+from array import array
 from collections import deque
 from collections.abc import AsyncIterator
 
@@ -58,6 +73,44 @@ LOW_CONFIDENCE = 0.5
 # limited; the first check happens immediately.
 RECHECK_INTERVAL_SECONDS = 8.0
 
+# Confidence only helps when a final actually arrives, and often none does:
+# measured over four language pairs, only English into a Korean-pinned
+# stream produced wrong-language finals. Korean into English, Japanese into
+# Spanish and German into French all went silent instead -- results simply
+# stop. So silence while someone is still talking is the other cue.
+STALL_SECONDS = 4.0
+
+# Related languages fool both cues above. German pinned to a French
+# speaker keeps producing plausible interims and simply never finalises
+# anything, so results flow and confidence is never offered. A line that
+# refuses to settle while someone keeps talking is the third cue. It is
+# longer than the stall because one unbroken sentence can legitimately run
+# a while before it settles.
+NO_FINAL_SECONDS = 8.0
+
+# Speech measures around 3000 RMS through this pipeline and digital silence
+# is 0, so this sits far below one and far above a quiet microphone. Without
+# it, a pause in the conversation would look exactly like a stall.
+SPEECH_RMS = 300.0
+
+
+def _now() -> float:
+    """Indirection so tests can drive the time-based triggers."""
+    return time.monotonic()
+
+
+def has_speech(audio: bytes) -> bool:
+    """True when the audio is someone talking rather than a quiet room."""
+    usable = len(audio) - (len(audio) % 2)
+    if usable < 2:
+        return False
+    samples = array("h")
+    samples.frombytes(audio[:usable])
+    total = 0
+    for sample in samples:
+        total += sample * sample
+    return (total / len(samples)) ** 0.5 >= SPEECH_RMS
+
 
 class AutoDetectSttStream(SttStream):
     def __init__(self, settings: Settings) -> None:
@@ -71,6 +124,9 @@ class AutoDetectSttStream(SttStream):
         self._pump: asyncio.Task[None] | None = None
         self._closing = False
         self._last_check = 0.0
+        self._last_result_at = 0.0
+        self._last_final_at = 0.0
+        self._pending_switch: str | None = None
         self.language: str | None = None
 
     # --- the SttStream interface --------------------------------------
@@ -79,6 +135,7 @@ class AutoDetectSttStream(SttStream):
         self._remember(pcm)
         if self._delegate is not None:
             await self._delegate.push(pcm)
+            await self._check_for_stall()
             return
         self._pending.extend(pcm)
         if len(self._pending) >= _DETECT_BYTES:
@@ -112,7 +169,14 @@ class AutoDetectSttStream(SttStream):
     def _remember(self, pcm: bytes) -> None:
         self._recent.append(pcm)
         self._recent_bytes += len(pcm)
-        while self._recent_bytes > _RECENT_BYTES and len(self._recent) > 1:
+        # Drop the oldest chunk only while doing so still leaves a full
+        # window. Trimming on total size alone empties the buffer whenever
+        # one chunk is larger than the window, and then there is not enough
+        # audio left to re-detect from.
+        while (
+            len(self._recent) > 1
+            and self._recent_bytes - len(self._recent[0]) >= _RECENT_BYTES
+        ):
             self._recent_bytes -= len(self._recent.popleft())
 
     def _recent_audio(self) -> bytes:
@@ -137,6 +201,7 @@ class AutoDetectSttStream(SttStream):
         logger.info("caption language: %s (detected=%s)", self.language, detected)
 
         self._delegate = self._open(self.language)
+        self._last_result_at = self._last_final_at = _now()
         self._ready.set()
         self._pump = asyncio.create_task(self._forward())
         await self._replay(buffered)
@@ -166,6 +231,9 @@ class AutoDetectSttStream(SttStream):
                 results = delegate.results()
                 try:
                     async for result in results:
+                        self._last_result_at = _now()
+                        if result.is_final:
+                            self._last_final_at = self._last_result_at
                         await self._out.put(
                             dataclasses.replace(result, language=self.language)
                         )
@@ -176,6 +244,11 @@ class AutoDetectSttStream(SttStream):
                     with contextlib.suppress(Exception):
                         await results.aclose()
                 if switch_to is None:
+                    # A stall may have found the new language instead, and
+                    # ended this stream to hand over to it.
+                    switch_to = self._pending_switch
+                self._pending_switch = None
+                if switch_to is None or self._closing:
                     return
                 await self._swap(switch_to)
         finally:
@@ -188,7 +261,7 @@ class AutoDetectSttStream(SttStream):
         if result.confidence is None or result.confidence >= LOW_CONFIDENCE:
             return None
 
-        now = time.monotonic()
+        now = _now()
         if self._last_check and now - self._last_check < RECHECK_INTERVAL_SECONDS:
             return None
         self._last_check = now
@@ -208,6 +281,50 @@ class AutoDetectSttStream(SttStream):
         if detected is None or detected == self.language:
             return None
         return detected
+
+    async def _check_for_stall(self) -> None:
+        """Someone is still talking but nothing is coming back."""
+        if self._closing or self._pending_switch is not None:
+            return
+        now = _now()
+        silent = now - self._last_result_at >= STALL_SECONDS
+        unsettled = now - self._last_final_at >= NO_FINAL_SECONDS
+        if not (silent or unsettled):
+            return
+        if self._last_check and now - self._last_check < RECHECK_INTERVAL_SECONDS:
+            return
+
+        audio = self._recent_audio()
+        if len(audio) < _DETECT_BYTES:
+            return
+        if not has_speech(audio):
+            # A quiet room is not a stall. Treat it as a fresh start so the
+            # clocks do not run down while nobody is speaking.
+            self._last_result_at = self._last_final_at = now
+            return
+
+        self._last_check = now
+        try:
+            detected = await detect_language(audio, self._settings)
+        except Exception:
+            logger.exception("re-detection failed; staying on %s", self.language)
+            return
+        if detected is None or detected == self.language:
+            # Still the same language, so this is the recogniser's business,
+            # not ours. Wait again before asking a second time.
+            self._last_result_at = self._last_final_at = now
+            return
+
+        logger.info(
+            "%s while speaking; language looks like %s",
+            "no results" if silent else "nothing settling",
+            detected,
+        )
+        self._pending_switch = detected
+        # Ending the stream lets the forwarder pick the new language up.
+        with contextlib.suppress(Exception):
+            if self._delegate is not None:
+                await self._delegate.close()
 
     async def _swap(self, language: str) -> None:
         """Move to a new language without dropping the audio in flight."""

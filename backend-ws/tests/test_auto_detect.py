@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 
 import pytest
 
 from app.config import Settings
-from app.stt.auto import DETECT_SECONDS, AutoDetectSttStream
+from app.stt.auto import (
+    DETECT_SECONDS,
+    NO_FINAL_SECONDS,
+    STALL_SECONDS,
+    AutoDetectSttStream,
+    has_speech,
+)
 from app.stt.base import SttResult, SttStream
 from app.stt.detect import resolve_language
 
@@ -89,6 +96,7 @@ class FakeStream(SttStream):
         self.settings = settings
         self.pushed: list[bytes] = []
         self.closed = False
+        self.done = asyncio.Event()
         FakeStream.instances.append(self)
 
     async def push(self, pcm: bytes) -> None:
@@ -96,9 +104,13 @@ class FakeStream(SttStream):
 
     async def close(self) -> None:
         self.closed = True
+        self.done.set()
 
     #: One list of results per instance, in the order they are opened.
     scripts: list[list[SttResult]] = []
+    #: When true a stream stays open after its script, as a real one does
+    #: while the speaker is still talking, so a stall can be observed.
+    blocking = False
 
     async def results(self):
         index = FakeStream.instances.index(self)
@@ -109,12 +121,15 @@ class FakeStream(SttStream):
         )
         for result in script:
             yield result
+        if FakeStream.blocking:
+            await self.done.wait()
 
 
 @pytest.fixture
 def fake_google(monkeypatch):
     FakeStream.instances = []
     FakeStream.scripts = []
+    FakeStream.blocking = False
     import app.stt.google_v2 as google_v2
 
     monkeypatch.setattr(google_v2, "GoogleSttStream", FakeStream)
@@ -404,3 +419,132 @@ async def test_a_missing_confidence_is_not_read_as_a_bad_one(
 
     assert detect.calls["n"] == 1
     assert len(fake_google.instances) == 1
+
+
+# --- noticing a switch when no final ever arrives --------------------
+
+
+def loud(seconds: float) -> bytes:
+    """Audio with speech-level energy, so a stall is not read as a pause."""
+    return b"\x00\x40" * int(16_000 * seconds)
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """Drives the time-based triggers without touching the event loop."""
+
+    class Clock:
+        def __init__(self) -> None:
+            self.now = 1_000.0
+
+        def __call__(self) -> float:
+            return self.now
+
+        def advance(self, seconds: float) -> None:
+            self.now += seconds
+
+    ticker = Clock()
+    monkeypatch.setattr("app.stt.auto._now", ticker)
+    return ticker
+
+
+async def push_chunks(stream, audio: bytes) -> None:
+    """Feed audio the way the widget does, in 100 ms chunks."""
+    for start in range(0, len(audio), 3_200):
+        await stream.push(audio[start : start + 3_200])
+
+
+async def settle() -> None:
+    """Let the forwarder react to a stream that was ended under it."""
+    for _ in range(12):
+        await asyncio.sleep(0)
+
+
+def test_speech_is_told_apart_from_a_quiet_room():
+    assert has_speech(loud(0.5)) is True
+    assert has_speech(b"\x00\x00" * 8_000) is False
+    assert has_speech(b"") is False
+
+
+@pytest.mark.asyncio
+async def test_silence_from_the_recogniser_while_speaking_reopens_the_stream(
+    fake_google, monkeypatch, clock
+):
+    # Korean into an English-pinned stream produces no results at all, so
+    # there is never a final whose confidence could give the game away.
+    FakeStream.blocking = True
+    FakeStream.scripts = [[], [SttResult(text="fine", is_final=True, confidence=0.95)]]
+    monkeypatch.setattr("app.stt.auto.detect_language", detector("en-US", "ko-KR"))
+    stream = AutoDetectSttStream(settings())
+
+    await push_chunks(stream, loud(DETECT_SECONDS + 1))
+    clock.advance(STALL_SECONDS + 1)
+    await push_chunks(stream, loud(0.2))
+    await settle()
+
+    assert len(fake_google.instances) == 2
+    assert fake_google.instances[1].settings.stt_language == "ko-KR"
+    assert stream.language == "ko-KR"
+
+
+@pytest.mark.asyncio
+async def test_a_line_that_never_settles_while_speaking_reopens_the_stream(
+    fake_google, monkeypatch, clock
+):
+    # French into a German-pinned stream keeps producing plausible interims
+    # and never finalises, so neither silence nor confidence appears.
+    FakeStream.blocking = True
+    FakeStream.scripts = [
+        [SttResult(text="revising", is_final=False)],
+        [SttResult(text="fine", is_final=True, confidence=0.95)],
+    ]
+    monkeypatch.setattr("app.stt.auto.detect_language", detector("de-DE", "fr-FR"))
+    stream = AutoDetectSttStream(settings())
+
+    await push_chunks(stream, loud(DETECT_SECONDS + 1))
+    clock.advance(NO_FINAL_SECONDS + 1)
+    await push_chunks(stream, loud(0.2))
+    await settle()
+
+    assert len(fake_google.instances) == 2
+    assert fake_google.instances[1].settings.stt_language == "fr-FR"
+
+
+@pytest.mark.asyncio
+async def test_a_quiet_room_is_not_mistaken_for_a_stall(
+    fake_google, monkeypatch, clock
+):
+    # Nobody talking also produces no results. Re-detecting on that would
+    # spend a call on silence and could pin the session to a wrong guess.
+    detect = detector("en-US", "ko-KR")
+    monkeypatch.setattr("app.stt.auto.detect_language", detect)
+    FakeStream.blocking = True
+    FakeStream.scripts = [[]]
+    stream = AutoDetectSttStream(settings())
+
+    await push_chunks(stream, loud(DETECT_SECONDS + 1))
+    clock.advance(STALL_SECONDS + 1)
+    await stream.push(b"\x00\x00" * int(16_000 * (DETECT_SECONDS + 1)))
+    await settle()
+
+    assert detect.calls["n"] == 1  # the opening detection only
+    assert len(fake_google.instances) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_stall_in_the_same_language_does_not_reopen_anything(
+    fake_google, monkeypatch, clock
+):
+    detect = detector("en-US", "en-US")
+    monkeypatch.setattr("app.stt.auto.detect_language", detect)
+    FakeStream.blocking = True
+    FakeStream.scripts = [[]]
+    stream = AutoDetectSttStream(settings())
+
+    await push_chunks(stream, loud(DETECT_SECONDS + 1))
+    clock.advance(STALL_SECONDS + 1)
+    await push_chunks(stream, loud(0.2))
+    await settle()
+
+    assert detect.calls["n"] == 2  # it did look again
+    assert len(fake_google.instances) == 1  # but stayed put

@@ -79,12 +79,14 @@ caption arrives about 3.5 seconds in, but Arabic is misread as Hindi.
 
 If the speaker changes language mid-session, the caption follows. Google's
 streaming models transcribe one language per stream -- given several codes
-they pick one and drop the rest -- so a switch is noticed through the
-recogniser's own confidence, which collapses when the audio stops matching
-the language it was told to expect. That triggers a fresh detection and, if
-the language really has changed, a new stream with the recent audio
-replayed into it. Captions resume in the new language about four seconds
-after the switch.
+they pick one and drop the rest -- so the only option is to open a new one,
+which means noticing that the old one has gone wrong. A stream fed the
+wrong language may collapse in confidence, stop returning results, or keep
+revising a line that never settles, depending on the pair; all three are
+watched for. Any of them prompts a fresh detection, and a genuinely
+different answer opens a new stream with the recent audio replayed.
+Captions resume in the new language within a few seconds. Verified on
+English to Korean, Korean to English, and German to French.
 
 Google has no single streaming model that both detects a language and
 returns interim results, so two are used for what each is good at. One
