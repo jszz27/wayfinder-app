@@ -276,6 +276,14 @@ is the database.
 Running cost is about $10 a month, almost all Cloud SQL; Cloud Run scales
 to zero.
 
+Two scripts exist for operating it. `scripts\db.ps1` opens a `psql`
+session against the deployed database and closes the network door behind
+itself; `-Open` and `-Close` hold it open for a graphical client instead.
+`scriptsotate-db-password.ps1` rotates the database password: new
+secret versions, then the database user, then both services, then a check
+that it worked, and only then are the old versions retired -- so a failure
+anywhere leaves a way back.
+
 ## Tests
 
 ```powershell

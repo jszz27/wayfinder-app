@@ -184,5 +184,10 @@ A custom domain and HTTPS certificate — the `run.app` URLs are the
 addresses for now · Cloud SQL backups, off to keep the cost to one
 instance's worth · Staging as a separate project · Alerting and uptime
 checks, which belong with Sprint 5's reliability work · Lifting the
-one-instance ceiling on the REST API · Rotating the JWT signing key, which
-has no procedure yet · The 106 untested language pairs, still carried.
+one-instance ceiling on the REST API · The 106 untested language pairs,
+still carried.
+
+The database password now has a procedure — `scripts/rotate-db-password.ps1`,
+written after doing it by hand once and run for real twice. The JWT signing
+key still has none; the same shape would work, minus the Cloud SQL user
+step.
