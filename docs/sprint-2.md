@@ -50,6 +50,11 @@ has the shape §6 calls for without inventing a login ahead of schedule.
 Storage is in memory, as caption sessions have been since Sprint 1;
 PostgreSQL arrives with auth.
 
+> **Resolved in Sprint 3.** The placeholder is gone. A signed-in
+> conversation is rows; a signed-out one stays in this process and is
+> never written, because the model needs the earlier turns to answer a
+> follow-up but nobody asked for it to be kept.
+
 ---
 
 ## Issues
