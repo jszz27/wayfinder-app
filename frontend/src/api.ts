@@ -23,8 +23,13 @@ export async function createCaptionSession(
   return body.session_id;
 }
 
-export function captionSocketUrl(sessionId: string): string {
+/** `language` pins the recogniser; leaving it out asks it to detect. */
+export function captionSocketUrl(
+  sessionId: string,
+  language: string | null,
+): string {
   const fallback = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
   const base = import.meta.env.VITE_WS_BASE_URL ?? fallback;
-  return `${base}/ws/caption?session_id=${encodeURIComponent(sessionId)}`;
+  const url = `${base}/ws/caption?session_id=${encodeURIComponent(sessionId)}`;
+  return language ? `${url}&language=${encodeURIComponent(language)}` : url;
 }

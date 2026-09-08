@@ -32,7 +32,11 @@ const STREAM_END_TIMEOUT_MS = 3_000;
  * while auto-save is off: with no row there is nowhere for the words to
  * go, which is the same guarantee anonymous captioning already relies on.
  */
-export function useCaptionSession(source: AudioSource, persist: boolean) {
+export function useCaptionSession(
+  source: AudioSource,
+  persist: boolean,
+  pinnedLanguage: string | null,
+) {
   const [status, setStatus] = useState<SessionStatus>("idle");
   const [lines, setLines] = useState<CaptionLine[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -130,7 +134,7 @@ export function useCaptionSession(source: AudioSource, persist: boolean) {
       const sessionId =
         (keepTranscript ? sessionIdRef.current : null) ?? (await openSession(source, persist));
       sessionIdRef.current = sessionId;
-      const socket = new CaptionSocket(captionSocketUrl(sessionId), source, {
+      const socket = new CaptionSocket(captionSocketUrl(sessionId, pinnedLanguage), source, {
         onCaption: (caption) => {
           const seq = caption.seq + seqOffsetRef.current;
           setLines((previous) => mergeLine(previous, seq, caption.text, caption.is_final));
@@ -168,7 +172,7 @@ export function useCaptionSession(source: AudioSource, persist: boolean) {
       statusRef.current = "idle";
       setNotice(error instanceof Error ? error.message : "Could not start captions.");
     }
-  }, [finish, handleConnectionChange, persist, source, stop, teardown]);
+  }, [finish, handleConnectionChange, persist, pinnedLanguage, source, stop, teardown]);
 
   return {
     status,

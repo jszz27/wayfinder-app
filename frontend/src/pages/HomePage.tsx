@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useAccount } from "../auth/AuthProvider";
+import { pinnedLanguageName } from "../captions/languages";
 import { buildTranscript, downloadTranscript } from "../captions/transcript";
 import { CaptionPanel } from "../components/CaptionPanel";
 import { GuidePanel } from "../components/GuidePanel";
@@ -61,6 +62,9 @@ export function HomePage() {
   const [mode, setMode] = useState<Mode>("caption");
   const [source, setSource] = useState<AudioSource>("mic");
   const [fontSize, setFontSize] = useState<number>(FONT_SIZES[1]);
+  // Null is detect, which is what every session did before the setting
+  // existed and is still the default.
+  const [language, setLanguage] = useState<string | null>(null);
   const [keeping, setKeeping] = useState(false);
   const [kept, setKept] = useState(false);
   const [keepError, setKeepError] = useState<string | null>(null);
@@ -72,20 +76,35 @@ export function HomePage() {
   // only a session row gets a transcript written to it.
   const persist = signedIn && autoSave;
 
-  const { status, lines, notice, language, reset, start, stop, dismissNotice } =
-    useCaptionSession(source, persist);
+  const {
+    status,
+    lines,
+    notice,
+    language: detected,
+    reset,
+    start,
+    stop,
+    dismissNotice,
+  } = useCaptionSession(source, persist, language);
   const guide = useGuideSession();
 
   // A saved text size follows the account to whatever device it is signed
   // in on, which for someone who needs larger text is most of the reason
   // to have an account at all.
   useEffect(() => {
-    if (auth.account) setFontSize(auth.account.font_size);
+    if (!auth.account) return;
+    setFontSize(auth.account.font_size);
+    setLanguage(auth.account.caption_language);
   }, [auth.account]);
 
   const changeFontSize = (size: number) => {
     setFontSize(size);
     void auth.rememberFontSize(size);
+  };
+
+  const changeLanguage = (tag: string | null) => {
+    setLanguage(tag);
+    void auth.rememberCaptionLanguage(tag);
   };
 
   const forget = () => {
@@ -122,10 +141,17 @@ export function HomePage() {
         <p className="status-text" aria-live="polite">
           {STATUS_TEXT[source][status]}
         </p>
-        {language && (
-          <span className="language-chip" aria-live="polite">
-            {languageName(language)}
-          </span>
+        {/* Plan.md section 5: a pinned session reports no language,
+            because nothing was worked out. The chip still says which one
+            is in use -- it just is not news. */}
+        {language ? (
+          <span className="language-chip is-pinned">{pinnedLanguageName(language)}</span>
+        ) : (
+          detected && (
+            <span className="language-chip" aria-live="polite">
+              {languageName(detected)}
+            </span>
+          )
         )}
       </div>
 
@@ -230,7 +256,13 @@ export function HomePage() {
         Save as text file
       </button>
 
-      <SettingsBar fontSize={fontSize} onFontSizeChange={changeFontSize} />
+      <SettingsBar
+        fontSize={fontSize}
+        onFontSizeChange={changeFontSize}
+        language={language}
+        onLanguageChange={changeLanguage}
+        languageLocked={running}
+      />
 
       {signedIn ? (
         <div className="settings-bar">
@@ -322,7 +354,13 @@ export function HomePage() {
         )
       )}
 
-      <SettingsBar fontSize={fontSize} onFontSizeChange={changeFontSize} />
+      <SettingsBar
+        fontSize={fontSize}
+        onFontSizeChange={changeFontSize}
+        language={language}
+        onLanguageChange={changeLanguage}
+        languageLocked={false}
+      />
     </>
   );
 }

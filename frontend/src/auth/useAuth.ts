@@ -129,6 +129,12 @@ export function useAuth() {
       (autoSave: boolean) => remember({ auto_save: autoSave }),
       [remember],
     ),
+    // Null is a value here, not an omission: it means go back to
+    // detecting, which is why it is sent rather than left out.
+    rememberCaptionLanguage: useCallback(
+      (tag: string | null) => remember({ caption_language: tag }),
+      [remember],
+    ),
     dismissNotice: useCallback(() => setNotice(null), []),
   };
 }

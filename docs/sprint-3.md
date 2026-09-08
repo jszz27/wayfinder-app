@@ -122,6 +122,51 @@ destroying the beginning of the transcript instead. Checked both ways
 against the real database: with the fix, four lines; without it, the first
 two were gone and only the last two remained.
 
+### A pinned language replaces detection rather than joining it
+
+§8 lists language beside text size as one of the two accessibility
+settings. The column, the `PATCH` field and the client type all existed;
+nothing used them, and nothing carried the choice to the recogniser.
+
+The obstacle is that backend-ws is handed a `session_id` and nothing else.
+Three ways across were considered:
+
+1. **Read it from the database** through the session row's `user_id`. No
+   protocol change at all — but it only works when there *is* a row, so a
+   listener with auto-save off would silently lose their language. Tying
+   "which language" to "am I saving" is a coupling a user would experience
+   as a bug.
+2. **Put it in the first client message.** §5's client messages are
+   `audio_chunk` and `end_stream`; adding a field to either invents one.
+3. **An optional query parameter**, which is what was built.
+
+`?session_id=…&language=ko-KR`. Absent means detect, which is byte for byte
+what every session sent before the setting existed. This amends §5; it was
+flagged before it was written, and §5 now says so.
+
+Pinning turns detection **off** — `dataclasses.replace(settings,
+stt_language=tag, stt_auto_detect=False)`. A detector that could still
+overrule the choice would make the setting advisory, and someone who has
+said what language they are speaking is telling us not to guess. The trade
+is real and worth stating: auto-detect handles a speaker who changes
+language mid-session, and a pinned stream cannot. That is why "Detect
+automatically" is first in the menu and stays the default.
+
+A malformed tag is logged and ignored rather than fatal. A preference
+should never be the reason captions do not start.
+
+The check is a *shape*, not a list, matching `PATCH /api/users/me`
+exactly: pinning a language the recogniser supports but detection does not
+is a legitimate thing to want. The widget's menu offers the eleven
+Wayfinder claims to support; the socket accepts any well-formed tag. What
+is offered and what is allowed are deliberately different.
+
+One consequence falls out of §5 rather than being designed:
+`caption.language` is reported "only when the language was detected rather
+than configured", so a pinned session reports `null` throughout. The chip
+still names the pinned language, in muted styling — it is the user's own
+choice read back to them, not news.
+
 ### Creating an account does not sign you in
 
 Signup answers with tokens and they are deliberately dropped. Someone who
@@ -197,23 +242,38 @@ so a mistake here cannot reach the development database.
 
 ## What is tested, and what is not
 
-**174 automated tests** — 108 REST, 66 WebSocket. The editing rules have
+**190 automated tests** — 108 REST, 82 WebSocket. The editing rules have
 their own file, `test_caption_sessions_editing.py`, whose point is the
 property above: renaming cannot discard an edit, editing cannot discard a
 name, and neither ever rewrites `caption_lines`.
 
-Verified by hand in a browser against a live server on a clean port:
+Verified by hand in a browser against live servers on clean ports:
 signup with a mismatched confirmation (refused before it is sent) and a
 matching one (redirected to sign in, not signed in), sign in, the header,
-the saved list, rename, delete, download, editing, both prompts, and the
-auto-save preference reaching the account. The downloaded file was checked
-byte by byte for its BOM.
+the saved list, rename, delete, download, editing, both prompts, and both
+preferences reaching the account. The downloaded file was checked byte by
+byte for its BOM.
 
-**Not covered by either.** The live recording path — Stop, Continue and
-the manual Save after real speech — needs a microphone and was not
-exercised in a browser. Its two halves were checked separately: that
-continuing appends rather than overwrites, against the real database; and
-that the manual save endpoint behaves, in the test suite.
+The recording path was exercised end to end with a real microphone:
+
+- **Auto-save on.** Start, Stop, Continue, Stop produced **one** session
+  row holding 14 lines numbered 0-13 with no gaps and no overwrites, from
+  two separate streams of 5 and 9 — which is the whole claim Continue
+  makes.
+- **Auto-save off.** Stop offered Reset and Save rather than Continue, the
+  save landed in the account, and the button then locked itself against a
+  second one.
+- **Language.** With Korean pinned the socket opened as
+  `?session_id=…&language=ko-KR`; with "Detect automatically" it opened
+  with no parameter at all. Both read from the server's own log. The menu,
+  the source pill and the auto-save toggle all lock while a stream is open.
+
+One thing to know about that run: backend-ws was first started without
+`DATABASE_URL`, so it fell back to `.env` and looked for the session in
+the *development* database, found nothing, and correctly wrote nothing.
+The zero-line result was the privacy model working, not a bug — but it is
+a good illustration of how quietly "no row, no transcript" fails safe, and
+of why the two services must be pointed at the same database.
 
 Also still open, carried from Sprint 2: the WebSocket takes a bare
 `session_id` with no token, so anyone holding an id could stream into that

@@ -163,6 +163,13 @@ body {
   white-space: nowrap;
 }
 
+/* A pinned language is the user's own choice read back to them, not
+   something the system worked out, so it does not ask for attention. */
+.language-chip.is-pinned {
+  color: var(--text-faded);
+  border-color: var(--border);
+}
+
 /* --- captions -------------------------------------------------------- */
 
 .caption-panel {
@@ -642,12 +649,37 @@ body {
 
 /* --- settings -------------------------------------------------------- */
 
+/* Text size and language, stacked. Each row keeps its own rule above it,
+   which is what makes the block below the captions read as settings
+   rather than as more controls. */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .settings-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-top: 4px;
+  padding-top: 6px;
   border-top: 1px solid var(--border);
+}
+
+.settings-select {
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.settings-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .settings-label {

@@ -69,7 +69,9 @@ GitHub Actions → Cloud deployment (GCP Cloud Run) → deploys REST/WebSocket s
 
 ## 5. WebSocket Message Spec
 
-**Endpoint**: `wss://api.example.com/ws/caption?session_id={session_id}`
+**Endpoint**: `wss://api.example.com/ws/caption?session_id={session_id}[&language={tag}]`
+
+`language` is the BCP-47 tag the listener has pinned in settings, and is optional. Absent means detect the language, which is what every session did before the setting existed. Present, it pins the recogniser and turns detection off — the setting would be advisory rather than a choice if a detector could still overrule it. A tag that is not well-formed is ignored rather than fatal: a preference should never be the reason captions do not start. Added in Sprint 3 to carry §8's language setting to the recogniser; see `docs/sprint-3.md`.
 
 Client → server:
 ```json
@@ -87,7 +89,7 @@ Server → client:
 
 `is_final: false` marks an interim result that may still be revised; `is_final: true` marks a confirmed sentence, and only confirmed sentences are written to the database.
 
-`language` is the BCP-47 tag the audio was recognised as. It is present only when the language was detected rather than configured, and `null` otherwise. Added after Sprint 1; see `docs/sprint-1.md`.
+`caption.language` is the BCP-47 tag the audio was recognised as. It is present only when the language was detected rather than configured, and `null` otherwise — so a session with a pinned `language` reports `null` throughout, because there was nothing to work out. Added after Sprint 1; see `docs/sprint-1.md`.
 
 ## 6. Database Schema (PostgreSQL)
 
