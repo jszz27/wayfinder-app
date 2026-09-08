@@ -21,6 +21,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -28,6 +29,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
     UniqueConstraint,
     func,
 )
@@ -57,6 +59,11 @@ class User(Base):
 
     # --- accessibility settings (Plan.md section 8) ---------------------
     font_size: Mapped[int] = mapped_column(Integer, default=20, nullable=False)
+    # Whether stopping a recording saves it without being asked. Off means
+    # the widget holds the transcript until the user presses Save.
+    auto_save: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
     # NULL means detect the language rather than pin it, which is what the
     # caption pipeline already does by default.
     caption_language: Mapped[str | None] = mapped_column(String(35), nullable=True)
@@ -95,6 +102,16 @@ class CaptionSession(Base):
     )
     language: Mapped[str | None] = mapped_column(String(35), nullable=True)
     audio_source: Mapped[str] = mapped_column(String(16), nullable=False)
+
+    # What the person called it. Null means it has not been renamed, and
+    # the interface shows the date instead.
+    title: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+    # What the person kept, when that differs from what was recognised.
+    # caption_lines stays exactly what the recogniser produced, so an edit
+    # can be undone and it remains clear which text came from where. Null
+    # until a session is edited or saved by hand.
+    edited_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="caption_sessions")
     lines: Mapped[list["CaptionLine"]] = relationship(

@@ -44,11 +44,14 @@ class UserResponse(BaseModel):
     # None means detect the language rather than pin it, which is what the
     # caption pipeline does by default.
     caption_language: str | None
+    # Whether stopping a recording keeps it without being asked.
+    auto_save: bool
 
 
 class UpdateSettingsRequest(BaseModel):
     font_size: int | None = Field(default=None, ge=MIN_FONT_SIZE, le=MAX_FONT_SIZE)
     caption_language: str | None = None
+    auto_save: bool | None = None
 
     @field_validator("caption_language")
     @classmethod
@@ -100,6 +103,14 @@ async def update_me(
 
     if "caption_language" in sent:
         user.caption_language = payload.caption_language
+
+    if "auto_save" in sent:
+        if payload.auto_save is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                "auto_save is on or off; it cannot be cleared.",
+            )
+        user.auto_save = payload.auto_save
 
     await db.flush()
     return UserResponse.model_validate(user, from_attributes=True)
