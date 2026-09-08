@@ -113,6 +113,14 @@ class GoogleSttStream(SttStream):
             ),
             language_codes=[settings.stt_language],
             model=settings.stt_model,
+            features=cloud_speech.RecognitionFeatures(
+                # Sentence boundaries matter more here than in most
+                # transcription: a caption without them is one unbroken
+                # run of words, which is exactly what this app exists to
+                # spare people. Applies to interim results too, so the
+                # punctuation appears live rather than only on finals.
+                enable_automatic_punctuation=True,
+            ),
         )
         streaming_config = cloud_speech.StreamingRecognitionConfig(
             config=config,

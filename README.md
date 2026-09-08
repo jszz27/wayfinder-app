@@ -64,6 +64,13 @@ Vertex AI, authenticating with the same credentials as speech-to-text.
 
 Issue checklist and evidence: [`docs/sprint-2.md`](./docs/sprint-2.md).
 
+## Punctuation
+
+Captions are punctuated as they are spoken, on interim results as well as
+confirmed ones, so sentence boundaries appear live rather than arriving at
+the end. Periods and question marks are produced; exclamation marks are
+not, because Google's punctuation model does not emit them.
+
 ## Language
 
 `STT_AUTO_DETECT=true` works the language out from the opening seconds of
