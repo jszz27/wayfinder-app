@@ -19,6 +19,11 @@ dependencies = [
     # longer maintained.
     "pyjwt>=2.8",
     "argon2-cffi>=23.1",
+    # EmailStr on the signup body needs this. FastAPI brings pydantic in
+    # but not the extra, so leaving it undeclared worked on a machine that
+    # happened to have it and failed on every clean install -- which is
+    # what CI caught the first time it ran.
+    "pydantic[email]>=2.9",
     # Read directly rather than relied on through uvicorn's extras: the
     # services load their own .env, so this is a first-class dependency.
     "python-dotenv>=1.0",

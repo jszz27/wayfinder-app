@@ -89,13 +89,25 @@ jobs:
 
       - name: Install
         working-directory: backend-ws
-        # Without [google]: this suite runs against the mock adapter, and
-        # pulling the cloud SDK in would only slow it down.
-        run: pip install -e ".[dev]"
+        # [google] as well as [dev], even though nothing here calls Google.
+        # test_google_response_mapping.py needs the SDK's protobuf types to
+        # build a response to map -- not credentials -- and skips itself
+        # without them. It covers where the Sprint 1 caption-blinking bug
+        # lived, so silently skipping it is the one thing this job must not
+        # do. The first CI run did exactly that: 91 tests instead of 96.
+        run: pip install -e ".[dev,google]"
 
       - name: Test
         working-directory: backend-ws
-        run: pytest -q
+        # A skip here means this environment is missing something, not that
+        # a case does not apply -- so it fails rather than passing quietly.
+        run: |
+          set -o pipefail
+          pytest -q -rs | tee result.txt
+          if grep -qE '[0-9]+ skipped' result.txt; then
+            echo "::error::tests were skipped; this environment is incomplete"
+            exit 1
+          fi
 
   frontend:
     name: Widget
