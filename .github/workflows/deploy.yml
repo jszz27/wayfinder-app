@@ -47,16 +47,27 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      # The runner has Docker, so it builds and pushes directly. Cloud
+      # Build would mean a staging bucket, the compute service account and
+      # four more permissions on the deployer, all to reach the same
+      # image. This machine used Cloud Build only because it has no Docker
+      # daemon; frontend/cloudbuild.yaml is that path.
+      - name: Let Docker push to Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
       # Built before anything is deployed, so a broken image never reaches
-      # a running service. Cloud Build rather than docker build, so the
-      # runner needs no registry credentials of its own.
+      # a running service.
       - name: Build the REST image
         working-directory: backend-rest
-        run: gcloud builds submit --tag "$REPO/backend-rest:${{ inputs.tag }}" .
+        run: |
+          docker build --tag "$REPO/backend-rest:${{ inputs.tag }}" .
+          docker push "$REPO/backend-rest:${{ inputs.tag }}"
 
       - name: Build the WebSocket image
         working-directory: backend-ws
-        run: gcloud builds submit --tag "$REPO/backend-ws:${{ inputs.tag }}" .
+        run: |
+          docker build --tag "$REPO/backend-ws:${{ inputs.tag }}" .
+          docker push "$REPO/backend-ws:${{ inputs.tag }}"
 
       # The schema moves first. A new column has to exist before the
       # revision that selects it takes traffic; the other order gives you
@@ -91,8 +102,11 @@ jobs:
         run: |
           REST_URL=$(gcloud run services describe backend-rest --region "$REGION" --format='value(status.url)')
           WS_URL=$(gcloud run services describe backend-ws --region "$REGION" --format='value(status.url)')
-          gcloud builds submit --config=cloudbuild.yaml \
-            --substitutions="_IMAGE=$REPO/frontend:${{ inputs.tag }},_REST_URL=$REST_URL,_WS_URL=${WS_URL/https:/wss:}" .
+          docker build \
+            --build-arg "VITE_REST_BASE_URL=$REST_URL" \
+            --build-arg "VITE_WS_BASE_URL=${WS_URL/https:/wss:}" \
+            --tag "$REPO/frontend:${{ inputs.tag }}" .
+          docker push "$REPO/frontend:${{ inputs.tag }}"
           gcloud run deploy frontend \
             --image "$REPO/frontend:${{ inputs.tag }}" \
             --region "$REGION"
