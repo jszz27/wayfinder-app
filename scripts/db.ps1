@@ -36,6 +36,12 @@
     psql session can. Close it yourself when you are done.
 
 .EXAMPLE
+    .\scripts\db.ps1 -Password
+    Prints just the password and changes nothing. Cloud SQL Studio runs
+    inside Google's network, so it needs no door opened -- only something
+    to type into the password box.
+
+.EXAMPLE
     .\scripts\db.ps1 -Close
     Closes the door again. This clears the allow-list completely, which
     is the posture the instance is meant to sit in.
@@ -43,7 +49,8 @@
 param(
     [string]$Query,
     [switch]$Open,
-    [switch]$Close
+    [switch]$Close,
+    [switch]$Password
 )
 
 $ErrorActionPreference = "Stop"
@@ -75,6 +82,17 @@ $env:CLOUDSDK_CORE_PROJECT = $Project
 Write-Host "Reading the password from Secret Manager..." -ForegroundColor DarkGray
 $env:PGPASSWORD = (& $Gcloud secrets versions access latest --secret=wayfinder-db-password)
 $Host_ = (& $Gcloud sql instances describe $Instance --format="value(ipAddresses[0].ipAddress)").Trim()
+
+if ($Password) {
+    Write-Host ""
+    Write-Host "  Database  $Database"
+    Write-Host "  Username  $DbUser"
+    Write-Host "  Password  $env:PGPASSWORD"
+    Write-Host ""
+    Write-Host "Nothing was opened. This is for Cloud SQL Studio in the console." -ForegroundColor DarkGray
+    Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    return
+}
 
 if ($Close) {
     & $Gcloud sql instances patch $Instance --clear-authorized-networks --quiet | Out-Null
