@@ -3,7 +3,12 @@
 AI-powered communication and digital accessibility platform.
 Full product plan and specification: [`Plan.md`](./Plan.md).
 
-> **Status: Sprint 3 complete — accounts, and text that is kept.**
+> **Status: Sprint 4 complete — deployed.**
+> Live at
+> [frontend-139220777182.us-central1.run.app](https://frontend-139220777182.us-central1.run.app).
+> Reliability hardening is Sprint 5 (see `Plan.md` §12).
+>
+> **Sprint 3 — accounts, and text that is kept.**
 > Live captioning, guide mode, accounts, and everything an account keeps:
 > saved text that can be renamed, corrected and downloaded, and guide
 > conversations that can be read back. CI/CD and reliability hardening are
@@ -17,8 +22,8 @@ Full product plan and specification: [`Plan.md`](./Plan.md).
 | `backend-ws/` | WebSocket server (caption streaming) | Implemented |
 | `backend-rest/` | REST API server (FastAPI) | All of `Plan.md` §4 |
 | `backend-ws/app/stt/` | External AI API (STT) | STT and LLM; no TTS in the product |
-| `backend-rest/alembic/` | PostgreSQL | Implemented |
-| — | GitHub Actions / Cloud Run | Sprint 4 (`Dockerfile`s staged now) |
+| `backend-rest/alembic/` | PostgreSQL | Cloud SQL, us-central1 |
+| `.github/workflows/` | GitHub Actions / Cloud Run | Deployed |
 
 Documentation and the widget's user-facing strings are both English.
 The language being *transcribed* is separate from the interface language:
@@ -242,6 +247,35 @@ does not exist in `global`.
 
 The interface language is separate and is English throughout.
 
+## Deployment
+
+Three Cloud Run services in us-central1, behind Cloud SQL and Secret
+Manager. `docs/sprint-4.md` has the reasoning; the short version:
+
+```powershell
+gh workflow run Deploy -f tag=v3     # build, migrate, deploy, verify
+```
+
+Deploying is manual on purpose. CI runs on every push and is the gate;
+`Deploy` is a decision. It builds both images, runs the migration job,
+deploys all three services, and then asks each of them for a 200 — a green
+deploy with a dead service behind it is worse than a red one.
+
+GitHub authenticates by Workload Identity Federation rather than a service
+account key, because this organisation blocks key creation outright. No
+long-lived credential exists in this repository or in GitHub's secret
+store; Actions mints an OIDC token per run, and the provider will only
+exchange one that comes from this repository.
+
+`backend-rest` runs with `--max-instances=1`, and that is correctness
+rather than cost. A guide conversation held while auto-save is off lives
+in that process's memory — a second instance would not have it, and Save
+would fail for no visible reason. `backend-ws` is uncapped: its only state
+is the database.
+
+Running cost is about $10 a month, almost all Cloud SQL; Cloud Run scales
+to zero.
+
 ## Tests
 
 ```powershell
@@ -262,6 +296,42 @@ the schema is dropped and rebuilt for each test. Create it once with
 ## Sprint log
 
 Per `Plan.md` §12, each sprint closes with a short retrospective here.
+
+### Sprint 4 (week 6) — CI/CD and deployment
+Issue checklist and verification evidence:
+[`docs/sprint-4.md`](./docs/sprint-4.md).
+
+**Delivered.** CI on every push, and the whole system running on Cloud Run
+against Cloud SQL, deployable again by one manual workflow. Signup, sign
+in, saved text and a real Gemini answer all verified against the deployed
+site.
+
+**What worked.** Writing CI before writing any deployment. It failed on
+its first run and found a dependency this project had never declared --
+`email-validator`, present here by accident and missing everywhere else.
+That same bug would have surfaced as a failed Docker build, or a crash
+loop on Cloud Run, at the point where it is hardest to read. The cheapest
+place to discover that a machine is not the world is a fresh container.
+
+**What surprised us.** Three of the four defects this sprint were
+environmental, not logical: an undeclared dependency, a CRLF inside a
+secret, and a build context that shipped a virtualenv. None is the kind of
+thing a test suite is shaped to catch, and all three are the kind of thing
+that only appears the first time software leaves the machine it was
+written on. Deployment is a test, and it tests things nothing else does.
+
+**What we would do differently.** Reaching for Cloud Build in the pipeline
+was a reflex from this machine having no Docker daemon. The runner has
+one. Two failed deploy runs and four unnecessary IAM grants went into
+propping up that choice before it was replaced with `docker build`.
+Asking "what does the machine that will actually run this have?" would
+have skipped all of it.
+
+**Carried forward.** The one-instance ceiling on the REST API is the first
+thing to lift if this ever needs to scale, and lifting it means deciding
+whether an unsaved conversation may exist as a row. No custom domain, no
+database backups, no alerting. The JWT signing key has no rotation
+procedure. The 106 untested language pairs are still untested.
 
 ### Sprint 3 (week 5) — Accounts, and text that is kept
 Issue checklist and verification evidence:
