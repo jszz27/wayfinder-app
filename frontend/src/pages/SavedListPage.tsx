@@ -75,6 +75,14 @@ export function SavedListPage() {
 
   return (
     <div className="page">
+      {/* The way back is the first thing on every page here, in the same
+          place and pointing one level up -- the session detail page has
+          the same link back to this list. The name in the corner is a
+          logo, and a logo is not something to have to guess about. */}
+      <Link className="account-link" to="/">
+        &larr; Live captions
+      </Link>
+
       <h1 className="page-title">Saved text</h1>
 
       {error && (
