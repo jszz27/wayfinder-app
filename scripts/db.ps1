@@ -27,9 +27,23 @@
 .EXAMPLE
     .\scripts\db.ps1 -Query "select email from users;"
     Runs one statement and exits.
+
+.EXAMPLE
+    .\scripts\db.ps1 -Open
+    Opens the door and prints what to type into pgAdmin or any other
+    client, then leaves it open. A graphical tool holds its connection
+    for as long as you are looking, so it cannot be wrapped the way a
+    psql session can. Close it yourself when you are done.
+
+.EXAMPLE
+    .\scripts\db.ps1 -Close
+    Closes the door again. This clears the allow-list completely, which
+    is the posture the instance is meant to sit in.
 #>
 param(
-    [string]$Query
+    [string]$Query,
+    [switch]$Open,
+    [switch]$Close
 )
 
 $ErrorActionPreference = "Stop"
@@ -62,6 +76,13 @@ Write-Host "Reading the password from Secret Manager..." -ForegroundColor DarkGr
 $env:PGPASSWORD = (& $Gcloud secrets versions access latest --secret=wayfinder-db-password)
 $Host_ = (& $Gcloud sql instances describe $Instance --format="value(ipAddresses[0].ipAddress)").Trim()
 
+if ($Close) {
+    & $Gcloud sql instances patch $Instance --clear-authorized-networks --quiet | Out-Null
+    Write-Host "Closed. Nothing on the internet can reach the database." -ForegroundColor Green
+    Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    return
+}
+
 # Whatever is on the list now, so it can be put back exactly.
 $before = (& $Gcloud sql instances describe $Instance `
     --format="value[delimiter=','](settings.ipConfiguration.authorizedNetworks[].value)").Trim()
@@ -71,6 +92,20 @@ $opened = if ($before) { "$before,$me/32" } else { "$me/32" }
 
 Write-Host "Opening the database to $me for this session..." -ForegroundColor DarkGray
 & $Gcloud sql instances patch $Instance --authorized-networks=$opened --quiet | Out-Null
+
+if ($Open) {
+    Write-Host ""
+    Write-Host "  Host      $Host_"
+    Write-Host "  Port      5432"
+    Write-Host "  Database  $Database"
+    Write-Host "  Username  $DbUser"
+    Write-Host "  Password  $env:PGPASSWORD"
+    Write-Host ""
+    Write-Host "The database is OPEN to $me until you close it:" -ForegroundColor Yellow
+    Write-Host "  .\scripts\db.ps1 -Close" -ForegroundColor Yellow
+    Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    return
+}
 
 try {
     Write-Host "Connected to the LIVE database. Changes here are real." -ForegroundColor Yellow
