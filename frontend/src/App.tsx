@@ -1,244 +1,57 @@
-import { useEffect, useState } from "react";
+import { Link, Outlet, RouterProvider, createBrowserRouter } from "react-router-dom";
 
-import { useAuth } from "./auth/useAuth";
-import { AccountPanel } from "./components/AccountPanel";
-import { downloadTranscript } from "./captions/transcript";
-import { CaptionPanel } from "./components/CaptionPanel";
-import { GuidePanel } from "./components/GuidePanel";
-import { ModeTabs, type Mode } from "./components/ModeTabs";
-import { ScreenPill } from "./components/ScreenPill";
-import { SettingsBar, FONT_SIZES } from "./components/SettingsBar";
-import { SourcePill } from "./components/SourcePill";
-import { useGuideSession } from "./guide/useGuideSession";
-import { useCaptionSession, type SessionStatus } from "./useCaptionSession";
-import type { AudioSource } from "./ws/protocol";
+import { AuthProvider } from "./auth/AuthProvider";
+import { Header } from "./components/Header";
+import { HomePage } from "./pages/HomePage";
+import { SavedListPage } from "./pages/SavedListPage";
+import { SessionDetailPage } from "./pages/SessionDetailPage";
+import { SignInPage } from "./pages/SignInPage";
+import { SignUpPage } from "./pages/SignUpPage";
 
-// Plan.md section 8: the status line changes with the chosen source,
-// because the two behave differently -- a microphone is granted once and
-// then simply listens, while playing audio has to be chosen every session.
-const STATUS_TEXT: Record<AudioSource, Record<SessionStatus, string>> = {
-  mic: {
-    idle: "Press Start to begin listening through your microphone.",
-    starting: "Preparing the microphone…",
-    listening: "Listening through the microphone…",
-    reconnecting: "Connection lost. Reconnecting…",
-    stopping: "Finishing up…",
-  },
-  tab_audio: {
-    idle: "Press Start, then choose the tab or screen you are listening to.",
-    starting: "Waiting for you to choose what to share…",
-    listening: "Listening to the shared audio…",
-    reconnecting: "Connection lost. Reconnecting…",
-    stopping: "Finishing up…",
-  },
-};
-
-function guideStatusText(sending: boolean, complete: boolean, sharing: boolean): string {
-  if (complete) return "This conversation is finished.";
-  if (sending) return "Working out the next step…";
-  if (sharing) return "The guide can see your screen when you send a question.";
-  return "Ask what to do next, one step at a time.";
+// Plan.md section 8 was amended in Sprint 3: captioning and guide mode are
+// still one widget behind two tabs, and the pages added here are the ones
+// that could not be a panel inside it -- a list of saved text, and one
+// session's own text, which has to be somewhere a link can point at.
+//
+// A data router rather than <BrowserRouter>, because useBlocker only
+// exists on this one, and stopping someone from navigating away from
+// unsaved edits is the reason the detail page can be trusted.
+function Shell() {
+  return (
+    <AuthProvider>
+      <div className="widget">
+        <Header />
+        <Outlet />
+      </div>
+    </AuthProvider>
+  );
 }
 
-/** Renders a BCP-47 tag as a language name, e.g. ko-KR -> Korean.
- *
- * Only the primary subtag is named, because the full tag reads as a
- * dialect -- "American English", "Korean (South Korea)" -- which is more
- * than the chip is claiming. Mandarin is reported as cmn, which
- * Intl.DisplayNames does not know by that name.
- */
-function languageName(tag: string): string {
-  const primary = tag.split("-")[0] ?? tag;
-  const forDisplay = primary === "cmn" || primary === "yue" ? "zh" : primary;
-  try {
-    return new Intl.DisplayNames(["en"], { type: "language" }).of(forDisplay) ?? tag;
-  } catch {
-    return tag;
-  }
+function NotFound() {
+  return (
+    <div className="page">
+      <h1 className="page-title">That page does not exist.</h1>
+      <Link className="account-link" to="/">
+        Back to live captions
+      </Link>
+    </div>
+  );
 }
+
+const router = createBrowserRouter([
+  {
+    element: <Shell />,
+    children: [
+      { path: "/", element: <HomePage /> },
+      { path: "/signin", element: <SignInPage /> },
+      { path: "/signup", element: <SignUpPage /> },
+      { path: "/saved", element: <SavedListPage /> },
+      { path: "/saved/:id", element: <SessionDetailPage /> },
+      { path: "*", element: <NotFound /> },
+    ],
+  },
+]);
 
 export default function App() {
-  const [mode, setMode] = useState<Mode>("caption");
-  const [source, setSource] = useState<AudioSource>("mic");
-  const [fontSize, setFontSize] = useState<number>(FONT_SIZES[1]);
-
-  const { status, lines, notice, language, reset, start, stop, dismissNotice } =
-    useCaptionSession(source);
-  const guide = useGuideSession();
-  const auth = useAuth();
-
-  // A saved text size follows the account to whatever device it is signed
-  // in on, which for someone who needs larger text is most of the reason
-  // to have an account at all.
-  useEffect(() => {
-    if (auth.account) setFontSize(auth.account.font_size);
-  }, [auth.account]);
-
-  const changeFontSize = (size: number) => {
-    setFontSize(size);
-    void auth.rememberFontSize(size);
-  };
-  const running = status !== "idle";
-  const guideSending = guide.status === "sending";
-  const guideComplete = guide.status === "complete";
-
-  return (
-    <main className="widget">
-      <ModeTabs mode={mode} onChange={setMode} />
-
-      {mode === "caption" ? (
-        <>
-          {/* The audio source is fixed for the whole session (Plan.md
-              section 5), so the control locks while a stream is open. */}
-          <SourcePill source={source} onChange={setSource} locked={running} />
-          <div className="status-row">
-            <p className="status-text" aria-live="polite">
-              {STATUS_TEXT[source][status]}
-            </p>
-            {language && (
-              <span className="language-chip" aria-live="polite">
-                {languageName(language)}
-              </span>
-            )}
-          </div>
-
-          <CaptionPanel
-            lines={lines}
-            fontSize={fontSize}
-            placeholder="Captions will appear here."
-          />
-
-          {notice && (
-            <div className="notice" role="alert">
-              <span>{notice}</span>
-              <button type="button" className="notice-dismiss" onClick={dismissNotice}>
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {running ? (
-            <button
-              type="button"
-              className="primary-button is-running"
-              onClick={() => void stop()}
-              disabled={status === "starting" || status === "stopping"}
-            >
-              Stop
-            </button>
-          ) : lines.length > 0 ? (
-            /* Stopping with a transcript on screen is a fork, not an end:
-               carry on after it, or clear it and be back at the beginning.
-               Both sit where Stop was, so the choice is where the eye
-               already is. Reset only clears -- it does not start listening,
-               because discarding a transcript and deciding to record again
-               are two decisions, not one. */
-            <div className="button-row">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={reset}
-              >
-                Reset
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => void start(true)}
-              >
-                Continue
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => void start(false)}
-            >
-              Start
-            </button>
-          )}
-
-          {/* Keeping what was said is the other half of being able to
-              follow it, so this stays available while listening too. */}
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => downloadTranscript(lines)}
-            disabled={lines.length === 0}
-          >
-            Save as text file
-          </button>
-
-          <SettingsBar fontSize={fontSize} onFontSizeChange={changeFontSize} />
-          <AccountPanel
-            status={auth.status}
-            account={auth.account}
-            notice={auth.notice}
-            busy={auth.busy}
-            onSignIn={auth.signIn}
-            onSignUp={auth.signUp}
-            onSignOut={() => void auth.signOut()}
-            onDismissNotice={auth.dismissNotice}
-          />
-        </>
-      ) : (
-        <>
-          {/* Plan.md section 10: screen sharing is never implicit -- the
-              user turns it on, and can see and turn it off at any time. */}
-          <ScreenPill
-            sharing={guide.sharing}
-            busy={guideSending}
-            onTurnOn={() => void guide.startSharing()}
-            onTurnOff={guide.stopSharing}
-          />
-          <div className="status-row">
-            <p className="status-text" aria-live="polite">
-              {guideStatusText(guideSending, guideComplete, guide.sharing)}
-            </p>
-          </div>
-
-          <GuidePanel
-            messages={guide.messages}
-            fontSize={fontSize}
-            sending={guideSending}
-            complete={guideComplete}
-            onSend={(text) => void guide.send(text)}
-          />
-
-          {guide.notice && (
-            <div className="notice" role="alert">
-              <span>{guide.notice}</span>
-              <button
-                type="button"
-                className="notice-dismiss"
-                onClick={guide.dismissNotice}
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {guideComplete ? (
-            <button type="button" className="primary-button" onClick={guide.reset}>
-              Start a new conversation
-            </button>
-          ) : (
-            guide.hasSession && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => void guide.finish()}
-                disabled={guideSending}
-              >
-                Finish this conversation
-              </button>
-            )
-          )}
-
-          <SettingsBar fontSize={fontSize} onFontSizeChange={changeFontSize} />
-        </>
-      )}
-    </main>
-  );
+  return <RouterProvider router={router} />;
 }

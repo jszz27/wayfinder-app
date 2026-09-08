@@ -118,12 +118,16 @@ guide_messages
 
 ## 8. Frontend Widget Wireframe
 
-A lightweight web widget with two tabs covering the whole feature set — no page navigation, no complex UI. (Unified as a web app rather than a browser extension — see section 11 for the reasoning.)
+A lightweight web widget with two tabs covering the live feature set — minimal navigation, no complex UI. (Unified as a web app rather than a browser extension — see section 11 for the reasoning.)
 
-- **Tabs**: Switches between "caption mode" and "guide mode." No separate screens or routing — everything lives in one widget.
+> **Amended in Sprint 3.** This section originally read "no page navigation" and "no separate screens or routing — everything lives in one widget." Saved text broke that: a saved session has to be reachable by a link, has to survive a reload, and has to be somewhere the browser's own Back button behaves. Both modes still live in the one widget; what moved out are the pages *about* an account's saved text. See `docs/sprint-3.md` for the reasoning.
+
+- **Routes**: `/` is the widget. `/saved` lists the signed-in user's saved text and `/saved/:id` is one session, where it can be read, corrected and downloaded. `/signin` and `/signup` are the account pages. Nothing else has an address.
+- **Tabs**: Switches between "caption mode" and "guide mode." Both live in one widget at `/` — no routing between them.
 - **Caption mode**: The audio source ("microphone" / "playing audio") is a sub-setting inside caption mode, not a peer of the mode tabs — it's rendered as a small pill-shaped segmented control with a muted "source" label, visually lighter and smaller than the tab buttons above it, so it doesn't read as a third or fourth mode. The status text below it changes with the selection ("Listening via mic…" / "Waiting for tab audio share…"). The most recently confirmed caption line is shown bold; earlier lines fade.
 - **Guide mode**: A chat-style UI. Uses the same small pill-control pattern as caption mode — a muted "screen reference" label plus an on/off segment — so both modes share a consistent "tab → sub-setting" visual hierarchy instead of stacking same-weight buttons.
-- **Settings**: Only accessibility-critical settings (font size, language) are exposed at the bottom; everything else stays hidden.
+- **Settings**: Only accessibility-critical settings (font size, language) are exposed at the bottom, plus auto-save for a signed-in user — it decides whether their speech is written down at all, which is not a preference to leave hidden. Everything else stays hidden.
+- **Header**: Says who is signed in and gets to their saved text. Signed out, it is the way to the account pages.
 
 ## 9. Caption Mode — Audio Source Design & Constraints
 

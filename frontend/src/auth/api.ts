@@ -9,6 +9,14 @@ export interface Account {
   display_name: string;
   font_size: number;
   caption_language: string | null;
+  auto_save: boolean;
+}
+
+/** The settings PATCH /api/users/me accepts, all of them optional. */
+export interface SettingsPatch {
+  font_size?: number;
+  caption_language?: string | null;
+  auto_save?: boolean;
 }
 
 async function readError(response: Response, fallback: string): Promise<string> {
@@ -37,12 +45,19 @@ async function post(path: string, body: unknown, fallback: string): Promise<Stor
   return (await response.json()) as StoredTokens;
 }
 
-export function signUp(
+/** Creates the account and nothing else.
+ *
+ * Signup answers with tokens, and they are deliberately dropped: someone
+ * who has just chosen a password is asked to type it once more on the sign
+ * in page, which is both the confirmation that it was memorable and the
+ * moment they learn where signing in happens.
+ */
+export async function signUp(
   email: string,
   password: string,
   displayName: string,
-): Promise<StoredTokens> {
-  return post(
+): Promise<void> {
+  await post(
     "/api/auth/signup",
     { email, password, display_name: displayName },
     "Could not create the account.",
@@ -75,11 +90,11 @@ export async function fetchAccount(): Promise<Account> {
   return (await response.json()) as Account;
 }
 
-export async function saveFontSize(fontSize: number): Promise<Account> {
+export async function saveSettings(patch: SettingsPatch): Promise<Account> {
   const response = await fetch(`${REST_BASE}/api/users/me`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ font_size: fontSize }),
+    body: JSON.stringify(patch),
   });
   if (!response.ok) throw new Error(await readError(response, "Could not save that setting."));
   return (await response.json()) as Account;

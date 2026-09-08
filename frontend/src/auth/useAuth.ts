@@ -3,11 +3,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchAccount,
   renew,
-  saveFontSize,
+  saveSettings,
   signIn as signInRequest,
   signOut as signOutRequest,
   signUp as signUpRequest,
   type Account,
+  type SettingsPatch,
 } from "./api";
 import {
   clearTokens,
@@ -62,28 +63,29 @@ export function useAuth() {
     })();
   }, [adopt, forget]);
 
-  const attempt = useCallback(
-    async (work: () => Promise<StoredTokens>) => {
-      setNotice(null);
-      setBusy(true);
-      try {
-        await adopt(await work());
-        return true;
-      } catch (error) {
-        setNotice(error instanceof Error ? error.message : "That did not work.");
-        return false;
-      } finally {
-        setBusy(false);
-      }
-    },
-    [adopt],
-  );
+  /** Runs one request, reporting its failure rather than throwing it. */
+  const attempt = useCallback(async (work: () => Promise<void>) => {
+    setNotice(null);
+    setBusy(true);
+    try {
+      await work();
+      return true;
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "That did not work.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   const signIn = useCallback(
-    (email: string, password: string) => attempt(() => signInRequest(email, password)),
-    [attempt],
+    (email: string, password: string) =>
+      attempt(async () => adopt(await signInRequest(email, password))),
+    [adopt, attempt],
   );
 
+  // Creating an account does not sign anyone in; the sign in page is where
+  // that happens, and where the new password gets used for the first time.
   const signUp = useCallback(
     (email: string, password: string, displayName: string) =>
       attempt(() => signUpRequest(email, password, displayName)),
@@ -98,11 +100,11 @@ export function useAuth() {
     if (token) await signOutRequest(token);
   }, [forget]);
 
-  const rememberFontSize = useCallback(
-    async (fontSize: number) => {
+  const remember = useCallback(
+    async (patch: SettingsPatch) => {
       if (status !== "signed-in") return;
       try {
-        setAccount(await saveFontSize(fontSize));
+        setAccount(await saveSettings(patch));
       } catch {
         // A setting that did not save is not worth interrupting for; it
         // still applies to this tab.
@@ -119,7 +121,14 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
-    rememberFontSize,
+    rememberFontSize: useCallback(
+      (fontSize: number) => remember({ font_size: fontSize }),
+      [remember],
+    ),
+    rememberAutoSave: useCallback(
+      (autoSave: boolean) => remember({ auto_save: autoSave }),
+      [remember],
+    ),
     dismissNotice: useCallback(() => setNotice(null), []),
   };
 }

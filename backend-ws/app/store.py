@@ -48,6 +48,12 @@ class CaptionStore:
         self._session_id = session_id
         self._uuid: uuid.UUID | None = None
         self._saving = False
+        # Where this connection's line numbering starts in the stored
+        # transcript. A session that is continued -- or one whose socket
+        # dropped and came back -- opens a fresh stream that counts from
+        # zero again, so the ordinals it reports are local to the stream
+        # and have to be placed after whatever is already written.
+        self._base_seq = 0
 
     @property
     def saving(self) -> bool:
@@ -72,6 +78,14 @@ class CaptionStore:
                     text("select 1 from caption_sessions where id = :id"),
                     {"id": self._uuid},
                 )
+                if found is not None:
+                    self._base_seq = await connection.scalar(
+                        text(
+                            "select coalesce(max(seq) + 1, 0) from caption_lines "
+                            "where session_id = :id"
+                        ),
+                        {"id": self._uuid},
+                    )
         except Exception:
             logger.exception(
                 "caption session %s: could not reach the database", self._session_id
@@ -82,9 +96,15 @@ class CaptionStore:
         return self._saving
 
     async def add_line(self, seq: int, line: str) -> None:
-        """Record one confirmed line (Plan.md section 5)."""
+        """Record one confirmed line (Plan.md section 5).
+
+        `seq` counts from zero within this stream; it is placed after the
+        lines already stored, so continuing a session extends the one
+        transcript instead of writing over its beginning.
+        """
         if not self._saving:
             return
+        stored_seq = self._base_seq + seq
         try:
             engine = get_engine(self._settings.database_url)
             async with engine.begin() as connection:
@@ -92,16 +112,16 @@ class CaptionStore:
                     text(
                         "insert into caption_lines (id, session_id, seq, text) "
                         "values (:id, :session_id, :seq, :text) "
-                        # A reconnect can replay a line ordinal that was
-                        # already written; the transcript should not gain a
-                        # duplicate because the socket blinked.
+                        # A line ordinal can still be replayed within one
+                        # stream; the transcript should not gain a duplicate
+                        # because the socket blinked.
                         "on conflict (session_id, seq) "
                         "do update set text = excluded.text"
                     ),
                     {
                         "id": uuid.uuid4(),
                         "session_id": self._uuid,
-                        "seq": seq,
+                        "seq": stored_seq,
                         "text": line,
                     },
                 )

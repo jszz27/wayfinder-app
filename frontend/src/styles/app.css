@@ -1,5 +1,7 @@
-/* Plan.md section 8: one lightweight widget, no routing. The visual
-   hierarchy is deliberate -- mode tabs read as the primary control, the
+/* Plan.md section 8, as amended in Sprint 3: captioning and guide mode
+   are still one lightweight widget behind two tabs, and the saved text
+   pages sit around it at their own addresses. The visual hierarchy inside
+   the widget is deliberate -- mode tabs read as the primary control, the
    audio source pill below them reads as a sub-setting of caption mode. */
 
 :root {
@@ -313,22 +315,209 @@ body {
   opacity: 0.45;
 }
 
-/* --- account -------------------------------------------------------- */
+/* --- header and pages ------------------------------------------------ */
 
-/* Below the settings rather than above the tabs: an account here is for
-   keeping your text size and your transcripts, not for getting in. */
-.account {
+/* Quiet by design. An account here is for keeping your text size and your
+   transcripts, not for getting in, so the header states who is signed in
+   and where their text is, and takes no more room than that. */
+.app-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-brand {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.header-actions {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.header-button {
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.page-lead {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* --- saved text ------------------------------------------------------ */
+
+.saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.saved-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* The name is the way in, so it carries the weight in the row. */
+.saved-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.saved-name:hover {
+  text-decoration: underline;
+}
+
+.saved-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-faded);
+}
+
+.saved-actions,
+.saved-rename {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.saved-rename input {
+  flex: 1 1 180px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.saved-actions .secondary-button {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* Deleting cannot be undone, so it is the one action that looks unlike
+   the others rather than sitting quietly among them. */
+.secondary-button.is-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Line breaks are the transcript's structure -- one confirmed line each --
+   so they survive into the reading view. */
+.session-text {
+  margin: 0;
+  padding: 16px;
+  white-space: pre-wrap;
+  line-height: 1.55;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.session-editor {
+  display: flex;
+}
+
+.session-editor textarea {
+  flex: 1;
+  min-height: 40vh;
+  padding: 16px;
+  font: inherit;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  resize: vertical;
+}
+
+/* --- prompts --------------------------------------------------------- */
+
+/* Unsaved work is the one thing on these pages worth interrupting for. */
+.prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.prompt {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.prompt-message {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.prompt-actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.account-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+.prompt-actions .primary-button,
+.prompt-actions .secondary-button {
+  padding: 11px;
+  font-size: 15px;
 }
+
+/* --- account -------------------------------------------------------- */
 
 .account-status {
   font-size: 12px;

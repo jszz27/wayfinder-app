@@ -24,8 +24,18 @@ export function transcriptFilename(now: Date = new Date()): string {
   return `wayfinder-captions-${stamp}.txt`;
 }
 
-export function downloadTranscript(lines: CaptionLine[]): void {
-  const text = buildTranscript(lines);
+/** A saved session's file name: its own title where it has one. */
+export function savedFilename(title: string | null, startedAt: string): string {
+  const named = (title ?? "").trim();
+  if (!named) return transcriptFilename(new Date(startedAt));
+  // Whatever someone typed as a title has to survive being a file name on
+  // three operating systems, so anything but letters, digits and spaces
+  // becomes a hyphen.
+  const safe = named.replace(/[^\p{L}\p{N} ]+/gu, "-").replace(/\s+/g, " ").trim();
+  return `${safe || "wayfinder-captions"}.txt`;
+}
+
+export function downloadText(text: string, filename: string): void {
   if (!text) return;
 
   // A byte order mark, because these transcripts are often Korean and some
@@ -38,7 +48,7 @@ export function downloadTranscript(lines: CaptionLine[]): void {
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = transcriptFilename();
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -46,4 +56,8 @@ export function downloadTranscript(lines: CaptionLine[]): void {
   // Revoked on the next tick: revoking immediately can cancel the download
   // in some browsers before it has read the blob.
   setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+export function downloadTranscript(lines: CaptionLine[]): void {
+  downloadText(buildTranscript(lines), transcriptFilename());
 }

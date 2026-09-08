@@ -27,13 +27,23 @@ export interface CaptionLine {
 // leaving the button stuck on "Finishing up".
 const STREAM_END_TIMEOUT_MS = 3_000;
 
-export function useCaptionSession(source: AudioSource) {
+/** `persist` asks the server for a session row, which is what makes
+ * backend-ws write the transcript down. It is false while signed out and
+ * while auto-save is off: with no row there is nowhere for the words to
+ * go, which is the same guarantee anonymous captioning already relies on.
+ */
+export function useCaptionSession(source: AudioSource, persist: boolean) {
   const [status, setStatus] = useState<SessionStatus>("idle");
   const [lines, setLines] = useState<CaptionLine[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [language, setLanguage] = useState<string | null>(null);
 
   const linesRef = useRef<CaptionLine[]>([]);
+  // Held across a stop so that Continue reopens the same session rather
+  // than starting a second one. backend-ws numbers a continued stream from
+  // zero again and places it after the lines already stored, so one
+  // continued recording stays one entry in the saved list.
+  const sessionIdRef = useRef<string | null>(null);
   // A continued session numbers its lines from zero again, so incoming
   // captions are shifted past whatever is already on screen. Without this
   // they would merge onto the retained transcript and overwrite it.
@@ -94,6 +104,7 @@ export function useCaptionSession(source: AudioSource) {
   /** Clears the transcript without recording, back to a fresh start. */
   const reset = useCallback(() => {
     if (statusRef.current !== "idle") return;
+    sessionIdRef.current = null;
     seqOffsetRef.current = 0;
     setLines([]);
     setLanguage(null);
@@ -107,6 +118,7 @@ export function useCaptionSession(source: AudioSource) {
     if (keepTranscript) {
       seqOffsetRef.current = nextSeq(linesRef.current);
     } else {
+      sessionIdRef.current = null;
       seqOffsetRef.current = 0;
       setLines([]);
     }
@@ -115,7 +127,9 @@ export function useCaptionSession(source: AudioSource) {
     statusRef.current = "starting";
 
     try {
-      const sessionId = await createCaptionSession(source);
+      const sessionId =
+        (keepTranscript ? sessionIdRef.current : null) ?? (await openSession(source, persist));
+      sessionIdRef.current = sessionId;
       const socket = new CaptionSocket(captionSocketUrl(sessionId), source, {
         onCaption: (caption) => {
           const seq = caption.seq + seqOffsetRef.current;
@@ -154,7 +168,7 @@ export function useCaptionSession(source: AudioSource) {
       statusRef.current = "idle";
       setNotice(error instanceof Error ? error.message : "Could not start captions.");
     }
-  }, [finish, handleConnectionChange, source, stop, teardown]);
+  }, [finish, handleConnectionChange, persist, source, stop, teardown]);
 
   return {
     status,
@@ -166,6 +180,16 @@ export function useCaptionSession(source: AudioSource) {
     stop,
     dismissNotice: useCallback(() => setNotice(null), []),
   };
+}
+
+/** An id to key the stream by, and a row behind it only when asked.
+ *
+ * Without a row backend-ws finds nothing and writes nothing, so an id made
+ * here is how "do not save this" is expressed -- no request field says it,
+ * and none can be forgotten.
+ */
+async function openSession(source: AudioSource, persist: boolean): Promise<string> {
+  return persist ? await createCaptionSession(source) : crypto.randomUUID();
 }
 
 /** The seq a continued session should start from, so it appends. */
