@@ -194,6 +194,17 @@ The two user groups (seniors in guide mode / students in caption mode) want conv
 | Sprint 3 | 5 | Auth & session management | Signup/login API / JWT middleware / session log retrieval API |
 | Sprint 4 | 6 | CI/CD & deployment | GitHub Actions workflow / Cloud Run deploy script / env vars & secrets management |
 | Sprint 5 | 7 | Reliability hardening | STT/LLM failure retry logic / error handling / incorporate beta feedback |
+| Sprint 6 | 8 | Accessibility and evidence | WCAG audit of the widget / focus handling in dialogs / test the language pairs the product claims |
+
+> **Sprint 6 was added after the plan.** The original five ended at
+> reliability, and two things were left standing that this project should
+> not have been comfortable with. The product is an accessibility tool
+> that had never had an accessibility audit — an omission that appeared on
+> no carried-forward list, because every retrospective tracked what was
+> deferred and none tracked what was never considered. And the README
+> claimed captions follow a speaker who changes language, on evidence from
+> three pairs out of a hundred and ten. A claim is not a feature until
+> something has checked it. See `docs/sprint-6.md`.
 
 **Issue conventions**:
 - Labels: `frontend` / `backend-rest` / `backend-ws` / `infra` / `bug`

@@ -32,6 +32,15 @@ dev = [
     "pytest-asyncio>=0.24",
     "httpx>=0.28",
 ]
+# Only for tests/language_matrix.py, which synthesises speech in eleven
+# languages to check what the recogniser does with each pair. Separate
+# from [dev] because it is a slow, paid, hand-run verification rather than
+# part of the suite, and separate from the runtime because nothing the
+# service does needs to speak.
+verify = [
+    "google-cloud-texttospeech>=2.16",
+    "websockets>=13.0",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
