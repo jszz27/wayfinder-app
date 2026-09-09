@@ -3,10 +3,12 @@
 AI-powered communication and digital accessibility platform.
 Full product plan and specification: [`Plan.md`](./Plan.md).
 
-> **Status: Sprint 4 complete — deployed.**
+> **Status: Sprint 5 complete — all five sprints delivered.**
 > Live at
 > [frontend-139220777182.us-central1.run.app](https://frontend-139220777182.us-central1.run.app).
-> Reliability hardening is Sprint 5 (see `Plan.md` §12).
+>
+> **Sprint 4 — deployed.** Three Cloud Run services, Cloud SQL, and a
+> pipeline that can do it again.
 >
 > **Sprint 3 — accounts, and text that is kept.**
 > Live captioning, guide mode, accounts, and everything an account keeps:
@@ -279,7 +281,8 @@ to zero.
 Two scripts exist for operating it. `scripts\db.ps1` opens a `psql`
 session against the deployed database and closes the network door behind
 itself; `-Open` and `-Close` hold it open for a graphical client instead.
-`scriptsotate-db-password.ps1` rotates the database password: new
+`scripts
+otate-db-password.ps1` rotates the database password: new
 secret versions, then the database user, then both services, then a check
 that it worked, and only then are the old versions retired -- so a failure
 anywhere leaves a way back.
@@ -292,7 +295,7 @@ cd backend-rest; pytest
 cd frontend;     npm run build    # type-check + bundle
 ```
 
-232 tests at the close of Sprint 3: 136 in `backend-rest`, 96 in
+260 tests at the close of Sprint 5: 155 in `backend-rest`, 105 in
 `backend-ws`.
 
 The REST tests need PostgreSQL. They run against `wayfinder_test`, never
@@ -301,9 +304,62 @@ that name before the app can read it and refuses to start otherwise, since
 the schema is dropped and rebuilt for each test. Create it once with
 `CREATE DATABASE wayfinder_test OWNER wayfinder;`.
 
+## Reliability
+
+A caption session outlives the streams it is made of. Google caps a
+streaming recognition at a few minutes and this app captions lectures, so
+`ResilientSttStream` opens another when one ends and replays the last two
+seconds of audio into it. Before that, the end of a stream ended the
+session -- and in the case where the stream merely finished rather than
+raising, it did so silently, which is the worst way for something to
+break.
+
+The guide model is asked again when the answer was "busy" rather than
+"no". The adapter decides which is which, since only it knows what its SDK
+raises. The whole retry budget is 1.4 seconds: a slow answer is worth
+having, a slow failure is not.
+
+Both give up rather than trying forever, because a service that fails
+instantly and repeatedly is broken, and hiding that helps nobody.
+
 ## Sprint log
 
 Per `Plan.md` §12, each sprint closes with a short retrospective here.
+
+### Sprint 5 (week 7) — Reliability hardening
+Issue checklist and verification evidence:
+[`docs/sprint-5.md`](./docs/sprint-5.md).
+
+**Delivered.** Recovery from the end of a recognition stream, and retry
+for a busy guide model. 260 tests pass; both are deployed and verified
+live.
+
+**What worked.** Reading the code for what it *admitted* rather than for
+what looked wrong. Three comments said "Sprint 5" and one of them --
+`stt/base.py`, on the seam -- led straight to the question "what happens
+when a stream ends?", which nothing answered. The defect was not found by
+testing or by a user report. It was found because a previous sprint had
+been honest about what it was deferring.
+
+**What surprised us.** The worst failure in the product was the quiet one.
+A stream that raised at least closed the socket and showed an error; a
+stream that simply finished left the app looking fine and doing nothing.
+It would never have appeared in a demo, because a demo is under five
+minutes. Silent failure deserves more suspicion than loud failure, and
+gets less.
+
+**What we would do differently.** Two bugs in this sprint were in the test
+doubles, not the code -- an attribute that shadowed the method it fed, and
+a fake that raised `StopIteration` inside a coroutine. Both cost more time
+to diagnose than the feature took to write, because the error messages
+pointed at recognition and the fault was in the scaffolding. Fakes that
+degrade beat fakes that run out.
+
+**Carried forward.** Nothing watches the deployment, so an outage is
+noticed by visiting it. The JWT signing key still has no rotation
+procedure where the database password now has one. The 106 untested
+language pairs have been carried since Sprint 2 and are now the oldest
+open item in the project.
 
 ### Sprint 4 (week 6) — CI/CD and deployment
 Issue checklist and verification evidence:
