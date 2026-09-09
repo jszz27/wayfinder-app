@@ -3,7 +3,7 @@
 AI-powered communication and digital accessibility platform.
 Full product plan and specification: [`Plan.md`](./Plan.md).
 
-> **Status: Sprint 5 complete — all five sprints delivered.**
+> **Status: Sprint 6 complete — audited and measured.**
 > Live at
 > [frontend-139220777182.us-central1.run.app](https://frontend-139220777182.us-central1.run.app).
 >
@@ -212,9 +212,15 @@ not, because Google's punctuation model does not emit them.
 
 `STT_AUTO_DETECT=true` works the language out from the opening seconds of
 audio and shows it beside the status line. English, Korean, Spanish,
-Mandarin, Japanese, French, Hindi, Arabic, Portuguese, German and Russian
-are recognised; anything else falls back to `STT_LANGUAGE`. All eleven were
-verified end to end against synthesised speech in each language.
+Mandarin, Japanese, French, Hindi, Portuguese, German and Russian are
+detected reliably.
+
+**Arabic is not.** Sprint 6 measured it: `chirp_2` reports Arabic as Hindi
+every time — six voices, at three, five and eight seconds of audio — while
+the same audio transcribes correctly as Arabic when the language is pinned.
+So the recogniser is fine and the detector is not. An Arabic speaker should
+choose Arabic in settings rather than rely on detection. See
+[`docs/language-matrix.md`](./docs/language-matrix.md).
 
 `DETECT_SECONDS` in `app/stt/auto.py` trades startup delay against
 accuracy. At three seconds all eleven languages are identified and the
@@ -236,8 +242,15 @@ wrong language may collapse in confidence, stop returning results, or keep
 revising a line that never settles, depending on the pair; all three are
 watched for. Any of them prompts a fresh detection, and a genuinely
 different answer opens a new stream with the recent audio replayed.
-Captions resume in the new language within a few seconds. Verified on
-English to Korean, Korean to English, and German to French.
+Captions resume in the new language within a few seconds.
+
+**Measured, not assumed: 68 of the 110 ordered pairs follow the speaker**
+(`docs/language-matrix.md`). Excluding Arabic, which detection cannot name
+at all, it is 68 of 90. The rest are mostly a stream failing to notice a
+switch between related Latin-script languages — English to French, English
+to Spanish — where none of the three triggers fires because the captions
+keep looking healthy. The code predicted that in a Sprint 2 comment; Sprint
+6 is what measured it.
 
 Google has no single streaming model that both detects a language and
 returns interim results, so two are used for what each is good at. One
@@ -325,6 +338,44 @@ instantly and repeatedly is broken, and hiding that helps nobody.
 ## Sprint log
 
 Per `Plan.md` §12, each sprint closes with a short retrospective here.
+
+### Sprint 6 (week 8) — Accessibility, and evidence for a claim
+Issue checklist and verification evidence:
+[`docs/sprint-6.md`](./docs/sprint-6.md); the language results are in
+[`docs/language-matrix.md`](./docs/language-matrix.md).
+
+**Delivered.** Lighthouse accessibility 94 to 100, dialogs that behave
+like dialogs, and the 110-pair language matrix that had been carried
+forward since Sprint 2. 68 of 110 pairs follow the speaker.
+
+**What worked.** Ruling out the obvious explanation before accepting the
+interesting one. Arabic came back as Hindi in all twenty of its pairs,
+which looked like a switching bug. Three checks said otherwise: pinned to
+Arabic the same audio transcribed as Arabic, more audio did not help at
+three, five or eight seconds, and six different voices all failed the same
+way. The fault is in the detection model, the workaround already exists,
+and none of that would have been knowable from the failure alone.
+
+**What surprised us.** The accessibility audit was never on a
+carried-forward list. Every retrospective in this project tracked what had
+been deferred, and deferred things have names and keep reappearing. This
+one had never been considered at all, in an accessibility product, for six
+sprints -- and the thing that finally surfaced it was asking what was
+missing rather than what was outstanding. Those are different questions
+and only one of them was being asked.
+
+**What we would do differently.** The README claimed language switching
+worked, on three samples out of a hundred and ten, for five sprints. The
+honest move at the time was either to test it or to soften the claim, and
+neither happened -- it just became a line item. A claim that cannot be
+checked cheaply should be written to the width of its evidence until it
+can be.
+
+**Carried forward.** A fourth switch trigger would plausibly recover the
+stayed-put pairs, and is now a measurable question rather than a guess.
+Nothing watches the deployment. The JWT signing key still has no rotation
+procedure. And the audit that finally counts -- a screen reader driven by
+somebody who uses one -- is not something this project can do for itself.
 
 ### Sprint 5 (week 7) — Reliability hardening
 Issue checklist and verification evidence:
