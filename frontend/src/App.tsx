@@ -23,7 +23,13 @@ function Shell() {
     <AuthProvider>
       <div className="widget">
         <Header />
-        <Outlet />
+        {/* A main landmark, so a screen reader can skip the header and
+            get to the thing the page is for. It was lost in Sprint 3:
+            <main className="widget"> became this div when the router
+            shell took over, and nothing noticed until Sprint 6 looked. */}
+        <main className="page-main">
+          <Outlet />
+        </main>
       </div>
     </AuthProvider>
   );

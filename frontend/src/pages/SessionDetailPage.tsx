@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useBlocker, useParams } from "react-router-dom";
 
 import { useAccount } from "../auth/AuthProvider";
@@ -198,7 +198,7 @@ export function SessionDetailPage() {
         <Prompt
           message={UNSAVED}
           actions={[
-            { label: "Stay on this page", onClick: () => blocker.reset() },
+            { label: "Stay on this page", cancel: true, onClick: () => blocker.reset() },
             {
               label: "Leave without saving",
               danger: true,
@@ -212,7 +212,7 @@ export function SessionDetailPage() {
         <Prompt
           message={UNSAVED_BEFORE_DOWNLOAD}
           actions={[
-            { label: "Cancel", onClick: () => setAsking(null) },
+            { label: "Cancel", cancel: true, onClick: () => setAsking(null) },
             {
               label: "Download without saving",
               onClick: () => {
@@ -238,7 +238,7 @@ export function SessionDetailPage() {
         <Prompt
           message={UNSAVED}
           actions={[
-            { label: "Keep editing", onClick: () => setAsking(null) },
+            { label: "Keep editing", cancel: true, onClick: () => setAsking(null) },
             { label: "Discard changes", danger: true, onClick: discard },
           ]}
         />
@@ -252,12 +252,80 @@ interface PromptAction {
   onClick: () => void;
   primary?: boolean;
   danger?: boolean;
+  /** The way out: what Escape does, and where focus lands on opening. */
+  cancel?: boolean;
 }
 
+/** A dialog that behaves like one.
+ *
+ * `aria-modal` is a claim, not a mechanism. Without the four things below
+ * it was a claim this dialog could not back: focus stayed on the button
+ * behind it, Tab walked out into eight other controls, and Escape did
+ * nothing. For someone using a keyboard or a screen reader that is not a
+ * modal -- it is a picture of one, over a page they are still standing in.
+ *
+ * The four: focus moves in on opening, Tab cycles within, Escape takes
+ * the way out, and focus returns to whatever opened it.
+ */
 function Prompt({ message, actions }: { message: string; actions: PromptAction[] }) {
+  const dialog = useRef<HTMLDivElement>(null);
+  const cancelIndex = Math.max(
+    actions.findIndex((action) => action.cancel),
+    0,
+  );
+
+  useEffect(() => {
+    // Whatever had focus before, so it can be handed back. Losing your
+    // place on the page is its own small harm.
+    const opener = document.activeElement as HTMLElement | null;
+    const buttons = () =>
+      Array.from(dialog.current?.querySelectorAll("button") ?? []);
+
+    // The safe option, not the destructive one: a dialog that opens with
+    // "Leave without saving" under the cursor is a trap.
+    buttons()[cancelIndex]?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        actions[cancelIndex]?.onClick();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = buttons();
+      if (focusable.length === 0) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      const on = document.activeElement;
+      // Wrap at both ends, so Tab cannot walk out of the dialog into the
+      // page it is covering.
+      if (event.shiftKey && (on === first || !dialog.current?.contains(on))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && on === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      opener?.focus?.();
+    };
+    // Mounted once per dialog, and the actions belong to that one dialog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="prompt-backdrop">
-      <div className="prompt" role="alertdialog" aria-modal="true" aria-label={message}>
+      <div
+        className="prompt"
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={message}
+        ref={dialog}
+      >
         <p className="prompt-message">{message}</p>
         <div className="prompt-actions">
           {actions.map((action) => (

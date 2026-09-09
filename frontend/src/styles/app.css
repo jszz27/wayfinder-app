@@ -9,8 +9,13 @@
   --surface: #ffffff;
   --border: #e2e2e6;
   --text: #1c1c1e;
-  --text-muted: #6b6b73;
-  --text-faded: #9a9aa3;
+  /* Measured against both grounds, not chosen by eye. The quiet greys
+     here were 2.61:1 -- an accessibility product whose own labels failed
+     WCAG AA, which is the kind of irony worth a comment. Muted was moved
+     down as well so that three levels of emphasis still read as three,
+     rather than collapsing into two once faded had to darken. */
+  --text-muted: #54545c;
+  --text-faded: #6f6f77;
   --accent: #2f5bd7;
   --accent-contrast: #ffffff;
   --danger: #b3261e;
@@ -26,7 +31,8 @@
     --border: #33333a;
     --text: #f2f2f4;
     --text-muted: #a2a2ad;
-    --text-faded: #6f6f7a;
+    /* 3.42:1 against the card surface before this. */
+    --text-faded: #85858d;
     --accent: #7b9bf5;
     --accent-contrast: #10131c;
     --danger: #f2b8b5;
@@ -363,6 +369,16 @@ body {
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
+}
+
+/* The landmark repeats the widget's column rather than using
+   `display: contents`, which has a history of removing elements from the
+   accessibility tree -- the last property to reach for on a landmark that
+   exists to be found. */
+.page-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .page {
