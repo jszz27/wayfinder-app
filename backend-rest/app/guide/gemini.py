@@ -18,6 +18,9 @@ from app.guide.prompt import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
+# Busy, not refusing: worth asking again in a moment.
+_RETRYABLE_STATUS = frozenset({429, 500, 503, 504})
+
 
 class GeminiGuideModel(GuideModel):
     def __init__(self, settings: Settings) -> None:
@@ -83,3 +86,27 @@ class GeminiGuideModel(GuideModel):
             logger.warning("gemini returned no text; finish=%s", response.candidates)
             raise RuntimeError("The guide model returned an empty answer.")
         return text
+
+    def is_transient(self, error: Exception) -> bool:
+        """Whether Vertex is momentarily busy rather than refusing.
+
+        Classified by status code, not by exception class: google-genai
+        raises several types across versions, and all of them carry the
+        code. 429 is the quota queue, 500 and 503 are the service having a
+        moment, 504 is it taking too long -- all of which a second attempt
+        a moment later usually gets past.
+
+        Everything else is permanent by omission. A 400 is a request the
+        model will refuse again, and a safety block is a decision, not a
+        hiccup.
+        """
+        code = getattr(error, "code", None) or getattr(error, "status_code", None)
+        if code in _RETRYABLE_STATUS:
+            return True
+        # Some versions surface the status only in the message.
+        return any(str(status) in str(error) for status in _RETRYABLE_STATUS) and (
+            "RESOURCE_EXHAUSTED" in str(error)
+            or "UNAVAILABLE" in str(error)
+            or "INTERNAL" in str(error)
+            or "DEADLINE_EXCEEDED" in str(error)
+        )

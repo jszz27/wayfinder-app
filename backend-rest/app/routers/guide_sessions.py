@@ -339,8 +339,10 @@ async def send_guide_message(
             screenshot_mime=screenshot_mime,
         )
     except Exception as error:
-        # Nothing is written on failure, so a retry does not leave a
-        # question stranded without an answer. Retry logic is Sprint 5.
+        # Nothing is written on failure, so asking again does not leave a
+        # question stranded without an answer. The model has already been
+        # asked more than once by this point: app/guide/retry.py retries a
+        # service that was busy, and does not retry one that refused.
         logger.exception("guide session %s: model call failed", session_id)
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY,

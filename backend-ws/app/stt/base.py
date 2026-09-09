@@ -2,7 +2,9 @@
 
 Keeping the WebSocket layer behind this seam is what lets the whole
 mic -> caption path run against the mock adapter with no cloud
-credentials, and lets Sprint 5 add retry/fallback in one place.
+credentials. It is also what let Sprint 5 add recovery in one place:
+app/stt/resilient.py wraps any adapter and opens a fresh stream when one
+ends early, so a session outlives the streams it is made of.
 """
 
 from __future__ import annotations

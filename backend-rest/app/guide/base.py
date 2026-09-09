@@ -40,3 +40,14 @@ class GuideModel(abc.ABC):
         The screenshot arrives as bytes and is never returned or stored;
         Plan.md section 10 keeps it out of guide_messages on purpose.
         """
+
+    def is_transient(self, error: Exception) -> bool:
+        """Is this worth asking again, or will it fail the same way?
+
+        The adapter answers, because only it knows what its own SDK
+        raises. Anything unrecognised is permanent: retrying a request the
+        model has already refused spends the user's time to arrive at the
+        same answer, and someone waiting for the next step of a bank
+        transfer notices every second of it.
+        """
+        return False

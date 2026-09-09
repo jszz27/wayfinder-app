@@ -205,7 +205,9 @@ class CaptionStreamSession:
         if self._failed:
             return
         self._failed = True
-        # Sprint 5 adds retry and fallback; for now one error, then close.
+        # Reached only once recovery has been exhausted: app/stt/resilient.py
+        # already reopened the stream and gave up, so there is nothing left
+        # to try and the honest thing is to say so and close.
         with contextlib.suppress(Exception):
             await self._send(ErrorMessage(message=message))
         with contextlib.suppress(Exception):
